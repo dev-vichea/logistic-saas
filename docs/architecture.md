@@ -41,8 +41,22 @@ Successful organization, membership, invitation, department and ownership mutati
 
 Reads are paginated (members/invitations/audit 30; departments 100), and tenant/foreign-key columns are indexed. The dashboard uses database counts and a bounded recent-event query. Regional country/currency/activity catalogs are centralized in Laravel, with Khmer-compatible UTF-8 strings and IANA timezones. Monetary transaction logic is outside this release.
 
+## Partner directory (v0.2)
+
+Partners owns private external company profiles and contacts. Locations owns reusable location records and location mutation rules. The only v0.2 location HTTP routes are nested below a partner. A location has a stable ID, organization ID, optional partner ownership at the schema level, address, type and optional coordinate pair. No shipment tables, shared/global company entities or cross-company account links are introduced.
+
+`Organization::partners()` resolves every parent; nested contacts/locations are then resolved through that parent. Child composite foreign keys enforce `(organization_id, business_partner_id)` consistency. Organization-wide mutation locking and fresh permission checks apply to every write. Contacts and locations have independent partial unique indexes allowing at most one primary record of each kind per partner; no primary record is also valid. Setting a new primary clears the previous primary atomically.
+
+All five membership roles receive `partners.view`. Owner, admin, manager and member receive `partners.manage`; owner/admin/manager receive `partners.archive`. These additions do not modify the v0.1 role permissions. Viewer remains read-only. Partner archival retains all child data, hides the company from default active queries, and blocks profile/contact/location writes until restoration. Repeated archive/restore requests do not emit duplicate lifecycle events.
+
+Roles are a validated JSONB array with a GIN index and database allowed-value checks. Directory queries always begin from the current organization relationship, AND the status/role/country filters, and group every OR search clause inside that tenant boundary. Search uses literal, escaped `ILIKE` substrings over company identifiers, selected contact fields and selected location fields. Sorting is allowlisted with a stable ID tie-breaker; name sorting has a corresponding expression index. Pagination is capped at 100. Leading-wildcard search is intentionally bounded by the tenant query; benchmark larger datasets before adding trigram/full-text indexes, which are not required or silently installed in this release.
+
+Directory country data is independent of the v0.1 SEA organization catalog. The public-domain [IANA ISO 3166 country table](https://data.iana.org/time-zones/tzdb/iso3166.tab) supplies global partner/location choices. Company HQ and business locations can have different countries. No external geocoding service is called.
+
+Future collaboration must introduce explicit consent and scoped relationship records; matching company names, email domains or tax identifiers must never merge or share directories automatically. Future shipment workflows can reference a tenant-qualified location ID and should snapshot addresses when historical accuracy matters. Such references must restrict hard deletion of used locations. v0.2 supports deleting unused contact/location records; it exposes no partner hard-delete endpoint.
+
 ## Adding future modules
 
 Add a module directory, its migrations, actions, requests and versioned routes. Reuse `ResolveOrganization` and pass `OrganizationContext` into tenant operations. Fetch resources through scoped relationships, add database tenant constraints, extend the role permission catalog, and record changes in the same transaction. Add tests that try another tenant’s IDs before exposing new UI. Queued jobs must carry explicit organization/resource IDs and resolve scope again; never depend on an HTTP session or a retained global tenant.
 
-Shipment, transport, driver, warehouse, customs, document AI and finance are extension points only. There are no placeholder tables, fake workflows or future-module menu entries.
+Shipment, transport, driver, warehouse, customs, document AI and finance are extension points only. The sidebar shows the target platform structure with future modules clearly marked Planned and disabled. No future operational tables, fake workflows or placeholder business data are implemented.

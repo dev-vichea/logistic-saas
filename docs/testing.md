@@ -34,3 +34,12 @@ The application and queue worker must already be running. Seed the optional demo
 The first test checks a 390px mobile viewport, menu navigation, horizontal overflow, organization switching, HttpOnly session cookies and logout. Failures produce screenshots and Playwright traces in ignored `test-results/`. The full email flow is skipped when `MAILPIT_URL` is absent; CI sets it, and release verification should too.
 
 CI runs backend checks with PHP 8.4/PostgreSQL 18 and browser integration with Redis sessions/cache/queues and Mailpit. `npm run build` checks a production bundle; browser tests use `next start`. Docker Compose config/image builds validate the development topology separately.
+
+`tests/e2e/sidebar.spec.ts` checks the complete module hierarchy, disabled planned entries, permission-aware navigation search, active links, persisted compact mode, role permissions and contact/location navigation. Mobile checks cover drawer focus restoration, keyboard search, scrolling, navigation and horizontal overflow. Future operational modules remain disabled and have no placeholder routes.
+
+
+## v0.2 partner regression coverage
+
+`tests/Feature/PartnerDirectoryTest.php` exercises all five membership roles, verified/guest access, parent/child tenant boundaries, cross-parent IDs, database foreign keys, multi-role CRUD, literal/numeric search, filters/sort/pagination, code uniqueness, archive/restore invariants, contacts, primary reassignment, addresses, coordinate validation and stale permissions. The existing foundation tests remain in the full suite.
+
+`tests/e2e/partners.spec.ts` drives real partner profile, contact and location forms, server-side coordinate validation, archive/restore, query filters, cross-organization visibility, mobile overflow and pagination using 21 PostgreSQL-backed records. The existing foundation email scenario also checks that its real viewer account can see the directory but cannot add partners. Run the complete suite with Mailpit enabled for all coverage. Browser fixtures create isolated test organizations and disposable development data; use a dedicated development instance. Fixture API requests honor `Retry-After` without disabling application limits. Repeated runs can exhaust the demo account’s 20-organizations/hour quota; use a fresh dedicated instance when that happens.

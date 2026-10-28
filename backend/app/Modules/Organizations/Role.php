@@ -12,12 +12,13 @@ enum Role: string
 
     public function permissions(): array
     {
-        $read = ['organization.view', 'dashboard.view', 'team.view', 'departments.view'];
+        $read = ['organization.view', 'dashboard.view', 'team.view', 'departments.view', 'partners.view', 'freight.view'];
 
         return match ($this) {
-            self::Owner => [...$read, 'organization.update', 'team.manage', 'departments.manage', 'audit.view', 'ownership.transfer'],
-            self::Admin => [...$read, 'organization.update', 'team.manage', 'departments.manage', 'audit.view'],
-            self::Manager => [...$read, 'departments.manage'],
+            self::Owner => [...$read, 'organization.update', 'team.manage', 'departments.manage', 'audit.view', 'ownership.transfer', 'partners.manage', 'partners.archive', 'freight.manage', 'freight.cancel'],
+            self::Admin => [...$read, 'organization.update', 'team.manage', 'departments.manage', 'audit.view', 'partners.manage', 'partners.archive', 'freight.manage', 'freight.cancel'],
+            self::Manager => [...$read, 'departments.manage', 'partners.manage', 'partners.archive', 'freight.manage', 'freight.cancel'],
+            self::Member => [...$read, 'partners.manage', 'freight.manage'],
             default => $read,
         };
     }

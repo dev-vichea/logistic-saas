@@ -276,5 +276,14 @@ test("registration, verified onboarding, invitations, RBAC, departments, audit a
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Delete Operations" }).click();
   await expect(page.getByText("A place for every team")).toBeVisible();
+  await teammate
+    .getByRole("link", { name: "Business partners", exact: true })
+    .click();
+  await expect(
+    teammate.getByRole("heading", { name: "Business partners", exact: true }),
+  ).toBeVisible();
+  await expect(
+    teammate.getByRole("link", { name: "Add partner", exact: true }),
+  ).toHaveCount(0);
   await teammateContext.close();
 });

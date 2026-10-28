@@ -1,4 +1,4 @@
-# Mekong — Logistics SaaS v0.1
+# Mekong — Logistics SaaS v0.2
 
 A working multi-company foundation for logistics businesses in Cambodia and Southeast Asia. Laravel owns authentication, validation, permissions and business rules. Next.js provides the responsive workspace UI.
 
@@ -8,9 +8,22 @@ A working multi-company foundation for logistics businesses in Cambodia and Sout
 - Create and switch organizations; edit company registration, contact and regional settings; select multiple logistics business activities.
 - Invite teammates, accept/revoke/resend invitations, assign fixed organization roles and departments, remove members and transfer ownership.
 - Tenant-isolated dashboard, company settings, team administration and paginated audit log.
+- Private business partner directories with eight business roles, company profiles, search/filter/sort/pagination and archive/restore.
+- Multiple contacts and reusable business locations with primary records, global country support and optional coordinates.
 - PostgreSQL migrations, database constraints, Redis sessions/cache/queues, API rate limits, automated feature/browser tests and CI.
 
-Shipment, transport execution, drivers, warehouses, customs operations, document AI and finance modules are intentionally outside v0.1.
+Shipment, transport execution, drivers, warehouses, customs operations, document AI and finance modules are intentionally outside v0.2.
+
+## Upgrade from v0.1
+
+The directory extends the existing foundation without changing authentication, organization selection, team management or company settings. With the existing stack running:
+
+```sh
+docker compose exec app php artisan migrate --force
+docker compose exec app php artisan queue:restart
+```
+
+Restart/rebuild deployed application processes after updating the code. The development frontend reloads automatically. No existing tables or records are replaced; one additive migration creates partner, contact and location tables. No partners are automatically imported or shared. Open **/partners** from the new Business partners sidebar item. See [v0.2 release notes](docs/v0.2.md) for permissions, API behavior, upgrade and validation details.
 
 ## Start with Docker Compose
 
@@ -47,7 +60,7 @@ npx playwright install chromium
 MAILPIT_URL=http://localhost:8025 npm run test:e2e
 ```
 
-Run `make demo` first for the browser test that exercises switching between sample companies. The second browser test creates fresh accounts and an organization through the UI, receives real verification/invitation/reset emails through Mailpit and checks role changes. It is skipped if `MAILPIT_URL` is unset. Tests create disposable sample records; use a development environment. See [testing](docs/testing.md).
+Run `make demo` first for the browser test that exercises switching between sample companies. The foundation email browser test creates fresh accounts and an organization through the UI, receives real verification/invitation/reset emails through Mailpit and checks role changes. Partner scenarios cover directory CRUD, contacts/locations, validation, archive/restore, isolation, filters and pagination. The email scenario is skipped if `MAILPIT_URL` is unset. Tests create disposable sample records; use a development environment. See [testing](docs/testing.md).
 
 After changing dependency lockfiles, update the mounted dependency volumes:
 
@@ -100,6 +113,8 @@ backend/app/Modules/
   Organizations/     Tenant context, fixed RBAC roles, profiles and mutations
   Team/              Memberships, invitations and departments
   Audit/             Transactional tenant audit events
+  Partners/          Private company profiles, contacts and directory queries
+  Locations/         Reusable organization-scoped business locations
 backend/app/Notifications/  Queued authentication mail
 frontend/src/app/            App Router pages and workspace route group
 frontend/src/components/     Feature UI and shadcn/ui components

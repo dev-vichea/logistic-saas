@@ -73,3 +73,45 @@ Single resources and catalogs use `{ "data": ... }`. Collections use Laravel pag
 - 429: rate limited; respect `Retry-After`.
 
 API responses set `Cache-Control: no-store, private`. General verified APIs allow 120 requests/minute per user; organization creation 20/hour; invitation sends/acceptance 10/minute. Authentication has an IP limit of 20/minute and a login limit of 5/minute per normalized email/IP. Verification resend/signature routes also use Fortify’s own throttles.
+
+
+## v0.2 business partner directory
+
+All paths below are relative to `/api/v1/organizations/{organization}/partners`. Every route uses the existing authenticated, verified organization context. The OpenAPI contract includes all 17 new operations.
+
+| Method | Path | Permission / behavior |
+|---|---|---|
+| GET | `/catalog` | `partners.view`; business roles, global countries and location types |
+| GET | `/` | `partners.view`; search, filter, sort and paginate |
+| POST | `/` | `partners.manage`; create external company profile |
+| GET / PATCH | `/{partner}` | View / partially update an active partner |
+| POST | `/{partner}/archive` or `/{partner}/restore` | `partners.archive`; idempotent lifecycle transitions |
+| GET / POST | `/{partner}/contacts` | List / create contacts |
+| GET / PATCH / DELETE | `/{partner}/contacts/{contact}` | View / update / delete a contact |
+| GET / POST | `/{partner}/locations` | List / create reusable locations |
+| GET / PATCH / DELETE | `/{partner}/locations/{location}` | View / update / delete a location |
+
+Owners, admins, managers and members can manage partner profiles and child records. Only owners/admins/managers can archive or restore. All organization roles can view. Child writes require `partners.manage`, and all profile/child writes return 409 while the parent is archived. Cross-tenant or unrelated parent/child IDs return 404. Partner hard deletion is not exposed.
+
+Partner creation requires `name` (max 200), `country_code` (global ISO alpha-2 choice) and a nonempty, distinct `roles` array. Roles are `customer`, `shipper`, `consignee`, `supplier`, `carrier`, `freight_forwarder`, `broker`, and `warehouse_operator`. Optional fields: `legal_name`, `code`, `registration_number`, `tax_number`, `email`, `phone`, HTTP(S) `website`, and `notes` (max 5000). `code` is trimmed, uppercased and unique within the organization, including archived records. External partners do not create Mekong accounts.
+
+Contact creation requires `name`; optional fields are `job_title`, `email`, `phone`, `notes` (max 2000), and boolean `is_primary`. Location creation requires `name`, `type`, `address_line_1`, `city`, and `country_code`; optional fields are `address_line_2`, `state`, `postal_code`, `latitude`, `longitude`, `notes` and `is_primary`. Types are `office`, `warehouse`, `port`, `airport`, `yard`, `delivery_site`, and `other`. Both coordinates must be populated or both null; latitude is -90 to 90 and longitude -180 to 180. Coordinates are stored to seven decimal places. Location country may differ from company HQ.
+
+PATCH is partial for these new resources: omitted fields are retained, optional fields can be cleared with null, and required fields cannot be cleared. The server validates the resulting coordinate pair on partial location updates. Tenant IDs, partner reassignment and direct `archived_at` writes are prohibited. Changing a primary atomically unsets the previous one; removing a primary does not automatically promote another record.
+
+Partner GET list/detail includes contact and location counts. Child lists paginate at 25, ordered primary first then ascending ID. Partner list defaults to 20 rows, active status and case-insensitive ascending company name. Supported query parameters:
+
+| Parameter | Values |
+|---|---|
+| `q` | Up to 120 characters; literal case-insensitive substring, including numeric `0` |
+| `status` | `active` (default), `archived`, `all` |
+| `role` | One of the eight business roles |
+| `country_code` | Global alpha-2 country choice |
+| `sort` | `name`, `code`, `country_code`, `created_at`, `updated_at` |
+| `direction` | `asc` or `desc` |
+| `page` | Integer 1–1,000,000 |
+| `per_page` | Integer 1–100; UI offers 20/50/100 |
+
+Search covers company/legal names, reference code, email, phone, tax/registration identifiers, contact names/emails/phones and location names/address line 1/cities. `%`, `_` and backslashes are escaped as literal search characters. Filters combine with AND. Sort columns are allowlisted, nullable values sort last and ID is the stable tie-breaker. Existing general API throttling and no-store headers apply.
+
+Audit actions are `partner.created`, `partner.updated`, `partner.archived`, `partner.restored`, `partner_contact.created|updated|deleted`, and `partner_location.created|updated|deleted`. Metadata contains IDs and changed field names, never contact/address/note values.
