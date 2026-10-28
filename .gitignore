@@ -1,0 +1,12 @@
+**/node_modules/
+**/.next/
+**/vendor/
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.testing.example
+**/database/*.sqlite*
+**/.phpunit.cache/
+**/test-results/
+**/playwright-report/
+.DS_Store

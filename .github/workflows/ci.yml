@@ -1,0 +1,123 @@
+name: Foundation checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: logistics_test
+          POSTGRES_USER: logistics
+          POSTGRES_PASSWORD: logistics
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U logistics -d logistics_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: logistics_test
+      DB_USERNAME: logistics
+      DB_PASSWORD: logistics
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, mbstring, intl, bcmath, zip
+          coverage: none
+      - run: composer install --prefer-dist --no-interaction
+        working-directory: backend
+      - run: cp .env.example .env && php artisan key:generate
+        working-directory: backend
+      - run: composer validate --strict && composer audit && php artisan test --compact
+        working-directory: backend
+      - run: vendor/bin/pint --format agent && git diff --exit-code -- .
+        working-directory: backend
+  browser:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: logistics
+          POSTGRES_USER: logistics
+          POSTGRES_PASSWORD: logistics
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U logistics -d logistics"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 20
+      mailpit:
+        image: axllent/mailpit:v1.32.0
+        ports: ["1025:1025", "8025:8025"]
+    env:
+      APP_ENV: local
+      APP_DEBUG: 'false'
+      APP_URL: http://localhost:3000
+      FRONTEND_URL: http://localhost:3000
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_DATABASE: logistics
+      DB_USERNAME: logistics
+      DB_PASSWORD: logistics
+      REDIS_HOST: 127.0.0.1
+      REDIS_CLIENT: predis
+      SESSION_DRIVER: redis
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      MAIL_MAILER: smtp
+      MAIL_HOST: 127.0.0.1
+      MAIL_PORT: 1025
+      API_INTERNAL_URL: http://127.0.0.1:8000
+      MAILPIT_URL: http://127.0.0.1:8025
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, mbstring, intl, bcmath, zip
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: composer install --prefer-dist --no-interaction
+        working-directory: backend
+      - run: cp .env.example .env && php artisan key:generate && php artisan migrate --force && php artisan db:seed --class=DemoSeeder --no-interaction
+        working-directory: backend
+      - run: npm ci && npm run lint && npm run typecheck && npm run build
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Start application and mail queue
+        run: |
+          cd backend
+          php artisan serve --host=127.0.0.1 --port=8000 > /tmp/mekong-api.log 2>&1 &
+          php artisan queue:work --sleep=1 --tries=3 --timeout=60 > /tmp/mekong-queue.log 2>&1 &
+          cd ../frontend
+          npm run start -- --hostname 127.0.0.1 > /tmp/mekong-web.log 2>&1 &
+          curl --retry 30 --retry-delay 1 --retry-connrefused --retry-all-errors --fail http://localhost:3000/login > /dev/null
+      - run: npm run test:e2e
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure
+          path: |
+            frontend/test-results/
+            /tmp/mekong-api.log
+            /tmp/mekong-queue.log
+            /tmp/mekong-web.log

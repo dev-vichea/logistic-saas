@@ -1,0 +1,104 @@
+name: logistics-foundation
+x-app: &app
+  build: ./backend
+  env_file: ./backend/.env
+  environment:
+    DB_HOST: postgres
+    DB_DATABASE: logistics
+    DB_USERNAME: logistics
+    DB_PASSWORD: logistics
+    REDIS_CLIENT: predis
+    REDIS_HOST: redis
+    SESSION_DRIVER: redis
+    CACHE_STORE: redis
+    QUEUE_CONNECTION: redis
+    MAIL_MAILER: smtp
+    MAIL_HOST: mailpit
+    MAIL_PORT: 1025
+    TRUSTED_PROXIES: 172.30.0.0/24
+  volumes:
+    - ./backend:/var/www/html
+    - php-vendor:/var/www/html/vendor
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: logistics
+      POSTGRES_USER: logistics
+      POSTGRES_PASSWORD: logistics
+    volumes:
+      - pg-data:/var/lib/postgresql
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/01-test-database.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logistics -d logistics"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  app:
+    <<: *app
+  queue:
+    <<: *app
+    command: ["php", "artisan", "queue:work", "--sleep=1", "--tries=3", "--timeout=60", "--max-time=3600"]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+  api:
+    image: nginx:1.28-alpine
+    volumes:
+      - ./docker/api.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/up"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      API_INTERNAL_URL: http://api
+      NEXT_TELEMETRY_DISABLED: 1
+    volumes:
+      - ./frontend:/app
+      - js-modules:/app/node_modules
+      - next-cache:/app/.next
+    depends_on:
+      api:
+        condition: service_healthy
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - "127.0.0.1:8025:8025"
+volumes:
+  pg-data:
+  redis-data:
+  php-vendor:
+  js-modules:
+  next-cache:
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
