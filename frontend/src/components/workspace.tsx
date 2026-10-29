@@ -8,11 +8,8 @@ import {
   type ReactNode,
   type CSSProperties,
 } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Menu,
-  Plus,
   ArrowUpRight,
   Loader2,
   CheckCircle2,
@@ -22,6 +19,8 @@ import {
   WorkspaceSidebar,
   useSidebarCompact,
 } from "@/components/navigation/workspace-sidebar";
+import { WorkspaceHeader } from "@/components/navigation/workspace-header";
+import { HeaderProvider, useHeaderContext } from "@/components/navigation/header-context";
 import { navigationLocation } from "@/lib/navigation";
 import axios from "axios";
 import { api, csrf, errorMessage } from "@/lib/api";
@@ -56,6 +55,7 @@ export function Workspace({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [open, setOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const refresh = useCallback(async () => {
     try {
@@ -149,96 +149,156 @@ export function Workspace({ children }: { children: ReactNode }) {
   const can = (p: string) => !!state.organization?.permissions.includes(p);
   return (
     <Context.Provider value={{ ...state, refresh, can, notify: setNotice }}>
-      <div
-        className="min-h-screen bg-background"
-        style={
-          { "--sidebar-width": compact ? "80px" : "280px" } as CSSProperties
-        }
-      >
-        <WorkspaceSidebar
-          user={state.user}
+      <HeaderProvider>
+        <WorkspaceInner
+          state={state}
+          location={location}
+          can={can}
+          switching={switching}
+          switchOrg={switchOrg}
+          logout={logout}
+          open={open}
+          setOpen={setOpen}
+          compact={compact}
+          toggle={toggle}
+          searchOpen={searchOpen}
+          setSearchOpen={setSearchOpen}
+          error={error}
+          setError={setError}
+          notice={notice}
+        >
+          {children}
+        </WorkspaceInner>
+      </HeaderProvider>
+    </Context.Provider>
+  );
+}
+
+function WorkspaceInner({
+  state,
+  location,
+  can,
+  switching,
+  switchOrg,
+  logout,
+  open,
+  setOpen,
+  compact,
+  toggle,
+  searchOpen,
+  setSearchOpen,
+  error,
+  setError,
+  notice,
+  children,
+}: {
+  state: {
+    user: User;
+    organization: Organization | null;
+    organizations: Organization[];
+  };
+  location: { group: string; label: string };
+  can: (permission: string) => boolean;
+  switching: boolean;
+  switchOrg: (id: string) => Promise<void>;
+  logout: () => Promise<void>;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  compact: boolean;
+  toggle: () => void;
+  searchOpen: boolean;
+  setSearchOpen: (open: boolean) => void;
+  error: string;
+  setError: (err: string) => void;
+  notice: string;
+  children: ReactNode;
+}) {
+  const { config } = useHeaderContext();
+  const isFullWidth = Boolean(config?.fullWidth);
+
+  return (
+    <div
+      className={isFullWidth ? "h-screen bg-background overflow-hidden" : "min-h-screen bg-background"}
+      style={
+        { "--sidebar-width": compact ? "80px" : "280px" } as CSSProperties
+      }
+    >
+      <WorkspaceSidebar
+        user={state.user}
+        organization={state.organization}
+        organizations={state.organizations}
+        can={can}
+        switching={switching}
+        onSwitch={switchOrg}
+        onLogout={logout}
+        mobileOpen={open}
+        onMobileOpenChange={setOpen}
+        compact={compact}
+        onToggleCompact={toggle}
+        searchOpen={searchOpen}
+        onSearchOpenChange={setSearchOpen}
+      />
+      <div className={`workspace-content flex flex-col ${isFullWidth ? "h-screen overflow-hidden" : "min-h-screen"}`}>
+        <WorkspaceHeader
           organization={state.organization}
           organizations={state.organizations}
+          user={state.user}
+          location={location}
           can={can}
           switching={switching}
           onSwitch={switchOrg}
           onLogout={logout}
           mobileOpen={open}
-          onMobileOpenChange={setOpen}
-          compact={compact}
-          onToggleCompact={toggle}
+          onOpenMobileMenu={() => setOpen(true)}
+          onOpenSearch={() => setSearchOpen(true)}
         />
-        <div className="workspace-content">
-          <header className="flex h-20 items-center justify-between border-b bg-white/80 px-6 sm:px-10">
-            <div className="flex items-center gap-4">
+        <main
+          className={
+            isFullWidth
+              ? "flex-1 min-h-0 w-full flex flex-col overflow-hidden p-0 m-0 max-w-none"
+              : "mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-6"
+          }
+        >
+          {error && (
+            <div
+              role="alert"
+              className="mx-4 my-2 rounded-xl bg-red-50 p-4 text-sm text-red-700"
+            >
+              {error}
               <button
-                onClick={() => setOpen(true)}
-                id="workspace-menu-toggle"
-                aria-label="Open menu"
-                aria-expanded={open}
-                aria-controls="workspace-mobile-navigation"
-                className="lg:hidden"
+                onClick={() => setError("")}
+                className="float-right"
+                aria-label="Dismiss error"
               >
-                <Menu size={22} />
+                <X size={16} />
               </button>
-              <div className="text-xs text-muted-foreground">
-                <span className="hidden sm:inline">
-                  {location.group}
-                  <span className="mx-3 text-border">/</span>
-                </span>
-                <span className="font-medium text-foreground">
-                  {location.label}
-                </span>
-              </div>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="hidden items-center gap-2 text-[11px] text-muted-foreground sm:flex">
-                <span className="size-1.5 rounded-full bg-primary" />
-                {state.organization?.country_code || "SEA"} workspace
-              </span>
-              <Link
-                href="/organizations/new"
-                className="flex items-center gap-1 text-xs font-medium text-primary"
-              >
-                <Plus size={15} /> New organization
-              </Link>
+          )}
+          {notice && (
+            <div
+              role="status"
+              className="fixed bottom-6 right-6 z-50 flex max-w-sm items-center gap-3 rounded-xl bg-[#0c2340] px-5 py-4 text-sm text-white shadow-xl"
+            >
+              <CheckCircle2 size={18} />
+              {notice}
             </div>
-          </header>
-          <main className="mx-auto max-w-[1440px] px-6 py-8 sm:px-10 sm:py-10">
-            {error && (
-              <div
-                role="alert"
-                className="mb-6 rounded-xl bg-red-50 p-4 text-sm text-red-700"
-              >
-                {error}
-                <button
-                  onClick={() => setError("")}
-                  className="float-right"
-                  aria-label="Dismiss error"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            )}
-            {notice && (
-              <div
-                role="status"
-                className="fixed bottom-6 right-6 z-50 flex max-w-sm items-center gap-3 rounded-xl bg-[#103f35] px-5 py-4 text-sm text-white shadow-xl"
-              >
-                <CheckCircle2 size={18} />
-                {notice}
-              </div>
-            )}
-            <div key={state.organization?.id || "none"}>{children}</div>
+          )}
+          <div
+            key={state.organization?.id || "none"}
+            className={isFullWidth ? "flex-1 min-h-0 w-full flex flex-col overflow-hidden" : ""}
+          >
+            {children}
+          </div>
+          {!isFullWidth && !config?.hideFooter && (
             <footer className="mt-12 flex items-center justify-between border-t pt-5 text-[10px] text-muted-foreground">
               <span>Mekong · Logistics, connected.</span>
               <span className="flex items-center gap-1">
                 Platform foundation <ArrowUpRight size={12} />
               </span>
             </footer>
-          </main>
-        </div>
+          )}
+        </main>
       </div>
-    </Context.Provider>
+    </div>
   );
 }

@@ -163,11 +163,11 @@ export function AuthScreen({ mode }: { mode: Mode }) {
     "/invitations/accept?token=" + encodeURIComponent(query.get("token") || "");
   return (
     <div className="auth-layout min-h-screen grid lg:grid-cols-[1fr_1fr]">
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[#0b302a] p-12 text-white lg:flex">
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[#0c1e3d] p-12 text-white lg:flex">
         <Brand />
         <div className="auth-orbit" aria-hidden="true" />
         <div className="relative max-w-lg">
-          <span className="eyebrow text-emerald-300">
+          <span className="eyebrow text-sky-300">
             BUILT FOR THE WAY YOU MOVE
           </span>
           <h1 className="mt-6 text-5xl font-semibold leading-[1.15] tracking-tight">
@@ -175,13 +175,13 @@ export function AuthScreen({ mode }: { mode: Mode }) {
             <br />
             Every company.
             <br />
-            <span className="text-emerald-300">Moving together.</span>
+            <span className="text-sky-300">Moving together.</span>
           </h1>
-          <p className="mt-6 max-w-sm leading-7 text-emerald-100/65">
+          <p className="mt-6 max-w-sm leading-7 text-blue-100/65">
             Connect your people and build the foundation for your logistics
             business across Southeast Asia.
           </p>
-          <div className="mt-10 flex flex-wrap gap-5 text-xs text-emerald-100/80">
+          <div className="mt-10 flex flex-wrap gap-5 text-xs text-blue-100/80">
             <span className="flex gap-2">
               <ShieldCheck size={16} /> Secure by design
             </span>
@@ -190,7 +190,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
             </span>
           </div>
         </div>
-        <p className="relative text-xs text-emerald-100/45">
+        <p className="relative text-xs text-blue-100/45">
           Mekong Logistics Platform · Foundation v0.1
         </p>
       </aside>
@@ -199,7 +199,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           <Brand />
         </div>
         <div className="m-auto w-full max-w-[390px] py-12">
-          <div className="mb-7 flex size-12 items-center justify-center rounded-2xl bg-emerald-50 text-primary">
+          <div className="mb-7 flex size-12 items-center justify-center rounded-2xl bg-blue-50 text-primary">
             {mode === "invitation" ? <Users /> : <ShieldCheck />}
           </div>
           <h2 className="text-3xl font-semibold tracking-tight">
@@ -229,7 +229,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           {notice && (
             <div
               role="status"
-              className="mt-6 flex gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+              className="mt-6 flex gap-2 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800"
             >
               <CheckCircle2 size={18} className="shrink-0" />
               {notice}

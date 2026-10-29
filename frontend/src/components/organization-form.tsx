@@ -232,11 +232,11 @@ export function OrganizationForm({ create = false }: { create?: boolean }) {
               {Object.entries(catalog.activities).map(([value, label]) => (
                 <label
                   key={value}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 text-xs transition-colors ${activities.includes(value) ? "border-primary/40 bg-emerald-50/60 text-primary" : "text-muted-foreground"}`}
+                  className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 text-xs transition-colors ${activities.includes(value) ? "border-primary/40 bg-blue-50/60 text-primary" : "text-muted-foreground"}`}
                 >
                   <input
                     type="checkbox"
-                    className="size-4 accent-emerald-700"
+                    className="size-4 accent-primary"
                     checked={activities.includes(value)}
                     onChange={(e) =>
                       setActivities(

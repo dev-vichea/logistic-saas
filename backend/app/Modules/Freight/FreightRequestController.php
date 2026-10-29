@@ -31,8 +31,10 @@ class FreightRequestController
             $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $request->query('q')).'%';
             $query->where(function (Builder $b) use ($pattern) {
                 $b->orWhere('request_number', 'ilike', $pattern)
-                  ->orWhere('cargo_description', 'ilike', $pattern)
-                  ->orWhereHas('customer', fn ($c) => $c->where('name', 'ilike', $pattern));
+                    ->orWhere('cargo_description', 'ilike', $pattern)
+                    ->orWhereHas('customer', fn ($c) => $c->where('name', 'ilike', $pattern))
+                    ->orWhereHas('originLocation', fn ($l) => $l->where('name', 'ilike', $pattern)->orWhere('city', 'ilike', $pattern))
+                    ->orWhereHas('destinationLocation', fn ($l) => $l->where('name', 'ilike', $pattern)->orWhere('city', 'ilike', $pattern));
             });
         }
 

@@ -24,6 +24,9 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
         Route::prefix('organizations/{organization}')->whereNumber('organization')->middleware(ResolveOrganization::class)->group(function () {
             require __DIR__.'/partners.php';
             require __DIR__.'/freight.php';
+            require __DIR__.'/transportation.php';
+            require __DIR__.'/documents.php';
+            require __DIR__.'/customs.php';
             Route::get('/', [OrganizationController::class, 'show']);
             Route::patch('/', [OrganizationController::class, 'update']);
             Route::post('switch', [OrganizationController::class, 'switch']);

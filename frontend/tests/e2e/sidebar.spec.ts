@@ -73,12 +73,22 @@ test("complete navigation, planned groups, search, permissions and compact rail"
   await transport.click();
   await expect(transport).toHaveAttribute("aria-expanded", "true");
   await expect(
-    sidebar.getByRole("button", { name: /^Planning & dispatch/ }),
-  ).toBeDisabled();
+    sidebar.getByRole("link", { name: "Dispatch run-sheets", exact: true }),
+  ).toBeVisible();
   await expect(
-    sidebar.getByRole("button", { name: /^Fleet & drivers/ }),
-  ).toBeDisabled();
+    sidebar.getByRole("link", { name: "Vehicles & fleet", exact: true }),
+  ).toBeVisible();
+  await expect(
+    sidebar.getByRole("link", { name: "Drivers registry", exact: true }),
+  ).toBeVisible();
   await transport.click();
+  const warehousing = sidebar.getByRole("button", { name: /^Warehousing/ });
+  await warehousing.click();
+  await expect(warehousing).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    sidebar.getByRole("button", { name: /^Receiving & outbound/ }),
+  ).toBeDisabled();
+  await warehousing.click();
   await sidebar
     .getByRole("button", { name: "Search navigation", exact: true })
     .click();
@@ -86,9 +96,9 @@ test("complete navigation, planned groups, search, permissions and compact rail"
     name: "Search navigation",
     exact: true,
   });
-  await search.getByRole("combobox", { name: "Find a page" }).fill("dispatch");
+  await search.getByRole("combobox", { name: "Find a page" }).fill("receiving");
   await expect(
-    search.getByRole("option", { name: /^Planning & dispatch/ }),
+    search.getByRole("option", { name: /^Receiving & outbound/ }),
   ).toBeDisabled();
   await expect(page).toHaveURL(/\/dashboard$/);
   await search

@@ -2,6 +2,9 @@
 
 namespace App\Modules\Freight;
 
+use App\Modules\Customs\CustomsDeclaration;
+use App\Modules\Documents\DocumentReconciliation;
+use App\Modules\Documents\TradeDocument;
 use App\Modules\Locations\Location;
 use App\Modules\Partners\BusinessPartner;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -74,5 +77,20 @@ class Shipment extends Model
     public function milestones(): HasMany
     {
         return $this->hasMany(ShipmentMilestone::class)->orderBy('occurred_at', 'desc');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(TradeDocument::class);
+    }
+
+    public function documentReconciliations(): HasMany
+    {
+        return $this->hasMany(DocumentReconciliation::class);
+    }
+
+    public function customsDeclarations(): HasMany
+    {
+        return $this->hasMany(CustomsDeclaration::class);
     }
 }

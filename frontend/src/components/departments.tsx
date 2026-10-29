@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetBody,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import {
   PageHeading,
   NoOrganization,
@@ -114,7 +116,7 @@ export function Departments() {
             {data.data.map((d) => (
               <section key={d.id} className="panel p-6">
                 <div className="flex justify-between">
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-50 text-primary">
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-primary">
                     <Network size={20} />
                   </div>
                   {manage && (
@@ -153,57 +155,64 @@ export function Departments() {
           <Pagination page={page} last={data.last_page} onChange={setPage} />
         </>
       )}
-      <Dialog
+      <Sheet
         open={open}
         onOpenChange={(value) => {
           if (!value) close();
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editing ? "Edit department" : "Create a department"}
-            </DialogTitle>
-            <DialogDescription>
-              Organize people around the work they do.
-            </DialogDescription>
-          </DialogHeader>
-          <ErrorBox message={error} />
-          <form onSubmit={save} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="department-name">Department name</Label>
-              <Input
-                id="department-name"
-                name="name"
-                defaultValue={editing?.name || ""}
-                placeholder="e.g. Operations"
-                maxLength={100}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <textarea
-                id="description"
-                name="description"
-                className="select-input min-h-24"
-                defaultValue={editing?.description || ""}
-                maxLength={500}
-                placeholder="What does this team do?"
-              />
-            </div>
-            <div className="flex justify-end gap-3">
+        <SheetContent side="right" size="default" className="p-0">
+          <form onSubmit={save} className="flex h-full flex-col">
+            <SheetHeader>
+              <SheetTitle>
+                {editing ? "Edit department" : "Create a department"}
+              </SheetTitle>
+              <SheetDescription>
+                Organize people around the work they do.
+              </SheetDescription>
+            </SheetHeader>
+            <SheetBody className="space-y-5">
+              <ErrorBox message={error} />
+              <div className="space-y-2">
+                <Label htmlFor="department-name">Department name</Label>
+                <Input
+                  id="department-name"
+                  name="name"
+                  defaultValue={editing?.name || ""}
+                  placeholder="e.g. Operations"
+                  maxLength={100}
+                  required
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <textarea
+                  id="description"
+                  name="description"
+                  className="select-input min-h-28 bg-white"
+                  defaultValue={editing?.description || ""}
+                  maxLength={500}
+                  placeholder="What does this team do?"
+                />
+              </div>
+            </SheetBody>
+            <SheetFooter>
               <Button type="button" variant="outline" onClick={close}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={busy}>
+              <Button
+                type="submit"
+                disabled={busy}
+                className="bg-blue-950 hover:bg-blue-900 text-white font-semibold shadow-2xs"
+              >
                 {busy && <Loader2 size={16} className="animate-spin" />}
                 {editing ? "Save changes" : "Create department"}
               </Button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

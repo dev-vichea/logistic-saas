@@ -1,361 +1,342 @@
 "use client";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+
+import { useState, useMemo } from "react";
 import Link from "next/link";
-import { type FormEvent, useTransition } from "react";
+import { type ColDef } from "ag-grid-community";
+import { type CustomCellRendererProps } from "ag-grid-react";
 import {
   Plus,
-  Search,
-  ShieldCheck,
   ArrowUpRight,
   Users,
   MapPin,
   Building2,
+  Phone,
+  Mail,
 } from "lucide-react";
 import { useWorkspace } from "@/components/workspace";
-import {
-  PageHeading,
-  NoOrganization,
-  Loading,
-  ErrorBox,
-  Empty,
-  Pagination,
-} from "@/components/common";
+import { NoOrganization, Loading, ErrorBox, Empty } from "@/components/common";
 import { useResource } from "@/lib/use-resource";
 import {
   partnerRoot,
+  type Partner,
   type PartnerPage,
   type PartnerCatalog,
 } from "@/lib/partners";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { MekongDataGrid } from "@/components/ui/data-grid";
 import { PartnerStatus } from "./fields";
+import {
+  WorkspaceHeaderSlot,
+  FilterPill,
+  SortPill,
+  ViewSettingsButton,
+} from "@/components/navigation/header-context";
+
 export function PartnerList({
   contactsMode = false,
 }: {
   contactsMode?: boolean;
 }) {
   const { organization, can } = useWorkspace();
-  const router = useRouter();
-  const routeBase = usePathname();
-  const query = useSearchParams();
-  const [pending, startTransition] = useTransition();
-  const catalog = useResource<{ data: PartnerCatalog }>(
-    organization ? `${partnerRoot(organization.id)}/catalog` : null,
+  const [search, setSearch] = useState<string>("");
+  const [tab, setTab] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sort, setSort] = useState<string>("name");
+
+  const catalogRes = useResource<{ data: PartnerCatalog }>(
+    organization ? `${partnerRoot(organization.id)}/catalog` : null
   );
-  if (!organization) return <NoOrganization />;
-  if (catalog.error) return <ErrorBox message={catalog.error} />;
-  if (!catalog.data) return <Loading />;
-  const data = catalog.data.data;
-  const change = (values: Record<string, string>) => {
-    const params = new URLSearchParams(query.toString());
-    params.delete("page");
-    for (const [key, value] of Object.entries(values)) {
-      if (value) params.set(key, value);
-      else params.delete(key);
-    }
-    startTransition(() =>
-      router.push(routeBase + "?" + params.toString(), { scroll: false }),
-    );
-  };
-  function search(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    change({
-      q: String(new FormData(event.currentTarget).get("q") || "").trim(),
-    });
+
+  const queryParams = new URLSearchParams();
+  queryParams.set("per_page", "100");
+  if (search.trim()) queryParams.set("q", search.trim());
+
+  if (tab === "shipper") queryParams.set("role", "shipper");
+  else if (tab === "carrier") queryParams.set("role", "carrier");
+  else if (tab === "customs_broker") queryParams.set("role", "customs_broker");
+  else if (tab === "archived") queryParams.set("status", "archived");
+  else {
+    if (roleFilter !== "all") queryParams.set("role", roleFilter);
+    if (statusFilter !== "all") queryParams.set("status", statusFilter);
   }
-  const add = can("partners.manage") ? (
-    <Button asChild>
-      <Link href="/partners/new">
-        <Plus size={16} />
-        Add partner
-      </Link>
-    </Button>
-  ) : undefined;
-  return (
-    <>
-      <PageHeading
-        eyebrow="YOUR BUSINESS NETWORK"
-        title={contactsMode ? "Contacts & locations" : "Business partners"}
-        description={
-          contactsMode
-            ? "Find people and business sites. Open a partner profile to manage its contacts and locations."
-            : "The customers, companies and people you move business with."
-        }
-        action={add}
-      />
-      <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
-        <ShieldCheck size={19} className="shrink-0 text-primary" />
-        <div>
-          <p className="text-xs font-medium">Private to {organization.name}</p>
-          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-            Your partner directory belongs to this organization. Partners do not
-            need a Mekong account, and their details are never shared
-            automatically.
-          </p>
-        </div>
-      </div>
-      <section className="panel mb-5 p-5">
-        <fieldset disabled={pending} className="min-w-0" aria-busy={pending}>
-          <form onSubmit={search} className="flex gap-2">
-            <div className="relative flex-1">
-              <Search
-                size={15}
-                className="absolute left-3 top-2 text-muted-foreground"
-              />
-              <Input
-                key={query.get("q") || ""}
-                name="q"
-                aria-label="Search partners"
-                placeholder="Search company, code, contact or location…"
-                className="pl-9"
-                defaultValue={query.get("q") || ""}
-                maxLength={120}
-              />
+
+  if (countryFilter !== "all") queryParams.set("country_code", countryFilter);
+
+  const partnersRes = useResource<PartnerPage>(
+    organization ? `${partnerRoot(organization.id)}?${queryParams.toString()}` : null
+  );
+
+  const catalog = catalogRes.data?.data;
+  const partners = partnersRes.data?.data || [];
+
+  const columnDefs = useMemo<ColDef<Partner>[]>(
+    () => [
+      {
+        headerName: "COMPANY / PARTNER",
+        field: "name",
+        minWidth: 260,
+        flex: 1.5,
+        cellRenderer: (params: CustomCellRendererProps<Partner>) => {
+          const partner = params.data;
+          if (!partner) return null;
+          return (
+            <div className="flex items-center gap-2.5 h-full py-1">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-900 border border-blue-200/60">
+                <Building2 size={15} />
+              </span>
+              <div className="flex flex-col min-w-0 leading-tight">
+                <Link
+                  href={`/partners/${partner.id}`}
+                  className="font-semibold text-slate-900 hover:text-blue-900 truncate"
+                >
+                  {partner.name}
+                </Link>
+                <span className="text-[11px] text-slate-400 font-mono truncate mt-0.5">
+                  {partner.code || partner.legal_name || "Partner #" + partner.id}
+                </span>
+              </div>
             </div>
-            <Button type="submit" variant="outline">
-              Search
-            </Button>
-          </form>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            <Filter
-              label="Business role"
-              value={query.get("role") || ""}
-              onChange={(value) => change({ role: value })}
-              options={{ "": "All roles", ...data.roles }}
-            />
-            <Filter
-              label="Country"
-              value={query.get("country_code") || ""}
-              onChange={(value) => change({ country_code: value })}
-              options={{ "": "All countries", ...data.countries }}
-            />
-            <Filter
-              label="Status"
-              value={query.get("status") || "active"}
-              onChange={(value) => change({ status: value })}
-              options={{
-                active: "Active partners",
-                archived: "Archived partners",
-                all: "All partners",
-              }}
-            />
-            <Filter
-              label="Sort by"
-              value={query.get("sort") || "name"}
-              onChange={(value) => change({ sort: value })}
-              options={{
-                name: "Company name",
-                code: "Reference code",
-                country_code: "Country code",
-                created_at: "Date added",
-                updated_at: "Last updated",
-              }}
-            />
-            <Filter
-              label="Sort direction"
-              value={query.get("direction") || "asc"}
-              onChange={(value) => change({ direction: value })}
-              options={{ asc: "Ascending", desc: "Descending" }}
-            />
-            <Filter
-              label="Rows per page"
-              value={query.get("per_page") || "20"}
-              onChange={(value) => change({ per_page: value })}
-              options={{
-                20: "20 per page",
-                50: "50 per page",
-                100: "100 per page",
-              }}
-            />
-          </div>
-          {query.toString() && (
-            <button
-              onClick={() => startTransition(() => router.push(routeBase))}
-              className="mt-4 text-xs font-medium text-primary"
-            >
-              Clear search & filters
-            </button>
-          )}
-        </fieldset>
-      </section>
-      <PartnerResults
-        key={query.toString()}
-        url={`${partnerRoot(organization.id)}?${query.toString()}`}
-        catalog={data}
-        contactsMode={contactsMode}
-        onPage={(page) => {
-          const params = new URLSearchParams(query.toString());
-          params.set("page", String(page));
-          router.push(routeBase + "?" + params.toString(), { scroll: false });
-        }}
-      />
-    </>
+          );
+        },
+      },
+      {
+        headerName: "BUSINESS ROLES",
+        field: "roles",
+        minWidth: 190,
+        flex: 1,
+        valueGetter: (params) =>
+          params.data?.roles.map((r) => catalog?.roles[r] || r).join(", ") || "",
+        cellRenderer: (params: CustomCellRendererProps<Partner>) => {
+          const partner = params.data;
+          if (!partner) return null;
+          return (
+            <div className="flex items-center h-full text-xs font-medium text-slate-700">
+              {partner.roles.map((role: string) => catalog?.roles[role] || role).join(", ")}
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "COUNTRY",
+        field: "country_code",
+        width: 140,
+        valueGetter: (params) =>
+          params.data ? catalog?.countries[params.data.country_code] || params.data.country_code : "",
+        cellRenderer: (params: CustomCellRendererProps<Partner>) => {
+          const partner = params.data;
+          if (!partner) return null;
+          return (
+            <div className="flex items-center h-full text-xs text-slate-700">
+              {catalog?.countries[partner.country_code] || partner.country_code}
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "CONTACT & SITES",
+        minWidth: 220,
+        flex: 1,
+        cellRenderer: (params: CustomCellRendererProps<Partner>) => {
+          const partner = params.data;
+          if (!partner) return null;
+          return (
+            <div className="flex flex-col justify-center h-full py-1 leading-tight">
+              <span className="text-xs text-slate-800 truncate flex items-center gap-1.5">
+                {partner.email ? (
+                  <>
+                    <Mail size={12} className="text-slate-400 shrink-0" />
+                    <span className="truncate">{partner.email}</span>
+                  </>
+                ) : partner.phone ? (
+                  <>
+                    <Phone size={12} className="text-slate-400 shrink-0" />
+                    <span>{partner.phone}</span>
+                  </>
+                ) : (
+                  <span className="text-slate-400 italic">No direct contact</span>
+                )}
+              </span>
+              <div className="mt-1 flex items-center gap-2.5 text-[11px] text-slate-500 font-mono">
+                <Link
+                  href={`/partners/${partner.id}#contacts`}
+                  className="flex items-center gap-1 hover:text-blue-900"
+                >
+                  <Users size={11} className="text-slate-400" />
+                  <span>{partner.contacts_count} contacts</span>
+                </Link>
+                <span className="text-slate-300">•</span>
+                <Link
+                  href={`/partners/${partner.id}#locations`}
+                  className="flex items-center gap-1 hover:text-blue-900"
+                >
+                  <MapPin size={11} className="text-slate-400" />
+                  <span>{partner.locations_count} sites</span>
+                </Link>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "STATUS",
+        field: "archived_at",
+        width: 120,
+        cellRenderer: (params: CustomCellRendererProps<Partner>) => {
+          const partner = params.data;
+          if (!partner) return null;
+          return (
+            <div className="flex items-center h-full">
+              <PartnerStatus archived={Boolean(partner.archived_at)} />
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "ACTIONS",
+        width: 100,
+        pinned: "right",
+        sortable: false,
+        filter: false,
+        suppressHeaderMenuButton: true,
+        cellRenderer: (params: CustomCellRendererProps<Partner>) => {
+          const partner = params.data;
+          if (!partner) return null;
+          return (
+            <div className="flex items-center justify-end h-full">
+              <Link href={`/partners/${partner.id}`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-blue-900 hover:text-blue-800 hover:bg-blue-50 gap-1"
+                >
+                  <span>Profile</span>
+                  <ArrowUpRight size={13} />
+                </Button>
+              </Link>
+            </div>
+          );
+        },
+      },
+    ],
+    [catalog]
   );
-}
-function Filter({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Record<string, string>;
-}) {
+
+  if (!organization) return <NoOrganization />;
+  if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
+  if (partnersRes.error) return <ErrorBox message={partnersRes.error} />;
+  if (!catalogRes.data) return <Loading />;
+
   return (
-    <label className="space-y-1.5">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
-      <select
-        aria-label={label}
-        className="select-input"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {Object.entries(options).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-function PartnerResults({
-  url,
-  catalog,
-  onPage,
-  contactsMode = false,
-}: {
-  url: string;
-  catalog: PartnerCatalog;
-  onPage: (page: number) => void;
-  contactsMode?: boolean;
-}) {
-  const { data, error } = useResource<PartnerPage>(url);
-  if (error) return <ErrorBox message={error} />;
-  if (!data) return <Loading />;
-  if (!data.data.length)
-    return (
-      <Empty
-        title="No partners found"
-        description="Add your first business partner or adjust your search and filters."
-        action={
-          data.current_page > 1 ? (
-            <Button variant="outline" onClick={() => onPage(1)}>
-              Back to first page
-            </Button>
+    <div className="flex flex-col h-full w-full">
+      <WorkspaceHeaderSlot
+        fullWidth={true}
+        title={contactsMode ? "Contacts & Sites" : "Business Partners"}
+        icon={Building2}
+        tabs={[
+          { id: "all", label: "All Partners", count: partners.length },
+          { id: "shipper", label: "Shippers / Clients" },
+          { id: "carrier", label: "Carriers & Fleet" },
+          { id: "customs_broker", label: "Customs Brokers" },
+          { id: "archived", label: "Archived" },
+        ]}
+        activeTab={tab}
+        onTabChange={(newTab) => {
+          setTab(newTab);
+        }}
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search company, code, contact or site..."
+        primaryAction={
+          can("partners.manage") ? (
+            <Link href="/partners/new">
+              <Button className="h-9 gap-1.5 bg-blue-900 hover:bg-blue-800 text-white shadow-xs text-xs font-semibold px-3.5">
+                <Plus size={14} />
+                <span>Add Partner</span>
+              </Button>
+            </Link>
           ) : undefined
         }
+        subHeader={
+          <>
+            <div className="flex items-center gap-2 flex-wrap">
+              <FilterPill
+                label="Role"
+                value={roleFilter}
+                options={[
+                  { value: "all", label: "All Roles" },
+                  ...Object.entries(catalog?.roles || {}).map(([val, lbl]) => ({
+                    value: val,
+                    label: lbl,
+                  })),
+                ]}
+                onChange={setRoleFilter}
+              />
+              <FilterPill
+                label="Country"
+                value={countryFilter}
+                options={[
+                  { value: "all", label: "All Countries" },
+                  ...Object.entries(catalog?.countries || {}).map(([code, name]) => ({
+                    value: code,
+                    label: `${code} - ${name}`,
+                  })),
+                ]}
+                onChange={setCountryFilter}
+              />
+              <FilterPill
+                label="Status"
+                value={statusFilter}
+                options={[
+                  { value: "all", label: "All Statuses" },
+                  { value: "active", label: "Active" },
+                  { value: "archived", label: "Archived" },
+                ]}
+                onChange={setStatusFilter}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <SortPill
+                value={sort}
+                options={[
+                  { value: "name", label: "Company name" },
+                  { value: "created_at", label: "Date added" },
+                ]}
+                onChange={setSort}
+              />
+              <ViewSettingsButton />
+            </div>
+          </>
+        }
       />
-    );
-  return (
-    <>
-      <div className="mb-3 text-xs text-muted-foreground">
-        {data.total} {data.total === 1 ? "partner" : "partners"} in this view
-      </div>
-      <section className="panel overflow-x-auto">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Company</th>
-              <th>Business roles</th>
-              <th>Country</th>
-              <th>Contact details</th>
-              <th>Status</th>
-              <th>
-                <span className="sr-only">Open profile</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.data.map((partner) => (
-              <tr key={partner.id}>
-                <td className="min-w-52">
-                  <Link
-                    href={`/partners/${partner.id}`}
-                    aria-label={partner.name}
-                    className="flex items-center gap-3 group"
-                  >
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-primary">
-                      <Building2 size={18} />
-                    </span>
-                    <span>
-                      <span className="block font-semibold group-hover:text-primary">
-                        {partner.name}
-                      </span>
-                      <span className="mt-1 block text-[10px] text-muted-foreground">
-                        {partner.code ||
-                          partner.legal_name ||
-                          "Company profile"}
-                      </span>
-                    </span>
-                  </Link>
-                </td>
-                <td className="min-w-40">
-                  <div className="flex max-w-56 flex-wrap gap-1">
-                    {partner.roles.map((role) => (
-                      <Badge
-                        variant="secondary"
-                        key={role}
-                        className="text-[9px] font-normal"
-                      >
-                        {catalog.roles[role]}
-                      </Badge>
-                    ))}
-                  </div>
-                </td>
-                <td className="whitespace-nowrap text-muted-foreground">
-                  {catalog.countries[partner.country_code]}
-                </td>
-                <td className="min-w-40">
-                  <span className="block text-[11px]">
-                    {partner.email || partner.phone || "—"}
-                  </span>
-                  <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
-                    <Link
-                      href={`/partners/${partner.id}#contacts`}
-                      aria-label={`Open contacts for ${partner.name}`}
-                      className="flex gap-1 hover:text-primary"
-                    >
-                      <Users size={12} />
-                      {partner.contacts_count}
-                      {contactsMode && " contacts"}
-                    </Link>
-                    <Link
-                      href={`/partners/${partner.id}#locations`}
-                      aria-label={`Open locations for ${partner.name}`}
-                      className="flex gap-1 hover:text-primary"
-                    >
-                      <MapPin size={12} />
-                      {partner.locations_count}
-                      {contactsMode && " locations"}
-                    </Link>
-                  </div>
-                </td>
-                <td>
-                  <PartnerStatus archived={!!partner.archived_at} />
-                </td>
-                <td>
-                  <Link
-                    href={`/partners/${partner.id}`}
-                    aria-label={`View ${partner.name}`}
-                    className="text-muted-foreground hover:text-primary"
-                  >
-                    <ArrowUpRight size={15} />
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-      <Pagination
-        page={data.current_page}
-        last={data.last_page}
-        onChange={onPage}
-      />
-    </>
+
+      {partners.length === 0 ? (
+        <div className="p-8">
+          <Empty
+            title="No Partners Found"
+            description="Add your first business partner or adjust your search and filters."
+            action={
+              can("partners.manage") ? (
+                <Link href="/partners/new">
+                  <Button className="gap-2 bg-blue-900 text-white">
+                    <Plus size={15} />
+                    Add Partner
+                  </Button>
+                </Link>
+              ) : undefined
+            }
+          />
+        </div>
+      ) : (
+        <MekongDataGrid<Partner>
+          rowData={partners}
+          columnDefs={columnDefs}
+          title="Directory of Business Partners"
+          quickFilterPlaceholder="Quick search partners..."
+          className="flex-1 min-h-0"
+        />
+      )}
+    </div>
   );
 }

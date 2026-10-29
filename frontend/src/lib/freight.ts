@@ -109,6 +109,7 @@ export type Booking = {
 
 export type ShipmentLeg = {
   id: number;
+  shipment_id: number;
   sequence: number;
   leg_type: "pre_carriage" | "main_carriage" | "on_carriage" | "customs_inspection";
   transport_mode: "road" | "ocean" | "air" | "rail";
@@ -126,6 +127,7 @@ export type ShipmentLeg = {
   carrier?: { id: number; name: string; code: string | null };
   origin_location?: { id: number; name: string; city: string; country_code: string };
   destination_location?: { id: number; name: string; city: string; country_code: string };
+  shipment?: Shipment;
 };
 
 export type ShipmentParticipant = {
@@ -188,6 +190,7 @@ export type Shipment = {
 };
 
 export type FreightCatalog = {
+  locations: { id: number; name: string; type?: string; city: string; country_code: string }[];
   transport_modes: { value: string; label: string }[];
   incoterms: string[];
   package_types: string[];

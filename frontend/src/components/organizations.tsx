@@ -48,7 +48,7 @@ export function Organizations() {
           {organizations.map((org) => (
             <section className="panel p-6" key={org.id}>
               <div className="flex justify-between">
-                <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-50 text-primary">
+                <div className="flex size-12 items-center justify-center rounded-xl bg-blue-50 text-primary">
                   <Building2 size={23} />
                 </div>
                 <Badge

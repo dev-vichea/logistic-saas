@@ -106,18 +106,18 @@ export function Dashboard() {
           ) : undefined
         }
       />
-      <section className="relative mb-7 overflow-hidden rounded-2xl bg-[#103f35] px-7 py-8 text-white sm:px-9">
+      <section className="relative mb-7 overflow-hidden rounded-2xl bg-[#0c2340] px-7 py-8 text-white sm:px-9">
         <div className="hero-grid" aria-hidden="true" />
         <div className="relative z-10 max-w-lg">
-          <div className="mb-5 flex items-center gap-2 text-[10px] font-semibold tracking-[.16em] text-emerald-200">
-            <span className="size-1.5 rounded-full bg-emerald-300" />
+          <div className="mb-5 flex items-center gap-2 text-[10px] font-semibold tracking-[.16em] text-blue-200">
+            <span className="size-1.5 rounded-full bg-blue-300" />
             YOUR CONNECTED FOUNDATION
           </div>
           <h2 className="text-2xl font-medium tracking-tight sm:text-[28px]">
             Good logistics starts with
             <br className="hidden sm:block" /> a connected team.
           </h2>
-          <p className="mt-3 max-w-md text-sm leading-6 text-emerald-100/65">
+          <p className="mt-3 max-w-md text-sm leading-6 text-blue-100/65">
             Your companies, people and business activities.
             <br />
             One shared space to build what comes next.
@@ -130,11 +130,11 @@ export function Dashboard() {
             <ArrowRight size={15} />
           </Link>
         </div>
-        <div className="absolute right-10 top-12 hidden size-40 rotate-[-12deg] items-center justify-center rounded-3xl border border-emerald-100/15 bg-white/5 xl:flex">
+        <div className="absolute right-10 top-12 hidden size-40 rotate-[-12deg] items-center justify-center rounded-3xl border border-blue-100/15 bg-white/5 xl:flex">
           <Compass
             size={88}
             strokeWidth={0.8}
-            className="text-emerald-100/70"
+            className="text-blue-100/70"
           />
         </div>
       </section>
@@ -206,7 +206,7 @@ export function Dashboard() {
           </div>
           <div className="px-6 pb-6">
             <div className="flex items-center gap-3 border-b pb-5">
-              <div className="flex size-11 items-center justify-center rounded-xl bg-emerald-50 text-lg font-semibold text-primary">
+              <div className="flex size-11 items-center justify-center rounded-xl bg-blue-50 text-lg font-semibold text-primary">
                 {org.name.slice(0, 1)}
               </div>
               <div>
@@ -258,7 +258,7 @@ export function Dashboard() {
                 key={event.id}
                 className="flex items-center gap-3 border-t py-4"
               >
-                <div className="size-2 rounded-full bg-emerald-200" />
+                <div className="size-2 rounded-full bg-blue-300" />
                 <span className="flex-1 text-xs capitalize">
                   {actionLabel(event.action)}
                 </span>

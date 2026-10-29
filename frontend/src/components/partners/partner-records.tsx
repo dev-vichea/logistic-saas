@@ -26,12 +26,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetBody,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import { Field, CountryField, NotesField } from "./fields";
 type RecordType = PartnerContact | PartnerLocation;
 export function PartnerRecords({
@@ -264,26 +266,27 @@ export function PartnerRecords({
           <Pagination page={page} last={data.last_page} onChange={setPage} />
         )}
       </div>
-      <Dialog
+      <Sheet
         open={open}
         onOpenChange={(value) => {
           if (!value) close();
         }}
       >
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editing ? "Edit" : "Add"} {noun}
-            </DialogTitle>
-            <DialogDescription>
-              {locations
-                ? "Save a reusable business location with its own address and optional coordinates."
-                : "Keep a person’s business contact details with this partner."}
-            </DialogDescription>
-          </DialogHeader>
-          <ErrorBox message={error} />
-          <form onSubmit={submit} className="space-y-5">
-            <fieldset disabled={busy} className="space-y-5">
+        <SheetContent side="right" size="lg" className="p-0">
+          <form onSubmit={submit} className="flex h-full flex-col">
+            <SheetHeader>
+              <SheetTitle>
+                {editing ? "Edit" : "Add"} {noun}
+              </SheetTitle>
+              <SheetDescription>
+                {locations
+                  ? "Save a reusable business location with its own address and optional coordinates."
+                  : "Keep a person’s business contact details with this partner."}
+              </SheetDescription>
+            </SheetHeader>
+            <SheetBody className="space-y-5">
+              <ErrorBox message={error} />
+              <fieldset disabled={busy} className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                   name="name"
@@ -409,7 +412,7 @@ export function PartnerRecords({
                 <input
                   type="checkbox"
                   name="is_primary"
-                  className="mt-0.5 accent-emerald-700"
+                  className="mt-0.5 accent-primary"
                   defaultChecked={editing?.is_primary ?? false}
                 />
                 <span>
@@ -420,18 +423,23 @@ export function PartnerRecords({
                 </span>
               </label>
             </fieldset>
-            <div className="flex justify-end gap-3">
+            </SheetBody>
+            <SheetFooter>
               <Button variant="outline" type="button" onClick={close}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={busy}>
-                {busy && <Loader2 size={16} className="animate-spin" />}Save{" "}
+              <Button
+                type="submit"
+                disabled={busy}
+                className="bg-blue-950 hover:bg-blue-900 text-white font-semibold shadow-2xs"
+              >
+                {busy && <Loader2 size={16} className="animate-spin mr-1.5" />}Save{" "}
                 {noun}
               </Button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </section>
   );
 }

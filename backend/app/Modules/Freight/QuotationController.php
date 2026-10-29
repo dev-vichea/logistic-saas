@@ -29,7 +29,7 @@ class QuotationController
             $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $request->query('q')).'%';
             $query->where(function (Builder $b) use ($pattern) {
                 $b->orWhere('quotation_number', 'ilike', $pattern)
-                  ->orWhereHas('customer', fn ($c) => $c->where('name', 'ilike', $pattern));
+                    ->orWhereHas('customer', fn ($c) => $c->where('name', 'ilike', $pattern));
             });
         }
 

@@ -1,28 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
-  Search,
   Truck,
   Ship,
   Plane,
   Layers,
   ArrowRight,
   Building2,
+  Package,
 } from "lucide-react";
+import type { ColDef } from "ag-grid-community";
+import type { CustomCellRendererProps } from "ag-grid-react";
 import { useWorkspace } from "@/components/workspace";
-import { PageHeading, NoOrganization, Loading, ErrorBox, Empty } from "@/components/common";
+import { NoOrganization, Loading, ErrorBox, Empty } from "@/components/common";
 import { useResource } from "@/lib/use-resource";
 import { freightRoot, type Shipment, type FreightCatalog } from "@/lib/freight";
 import { type Paginated } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { MekongDataGrid } from "@/components/ui/data-grid";
 import { NewShipmentDialog } from "./new-shipment-dialog";
+import {
+  WorkspaceHeaderSlot,
+  FilterPill,
+  DateRangePill,
+  SortPill,
+  ViewSettingsButton,
+} from "@/components/navigation/header-context";
 
 export function ShipmentList() {
   const { organization, can } = useWorkspace();
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [modeFilter, setModeFilter] = useState<string>("all");
+  const [customsFilter, setCustomsFilter] = useState<string>("all");
+  const [sort, setSort] = useState<string>("latest");
   const [search, setSearch] = useState<string>("");
 
   const catalogRes = useResource<{ data: FreightCatalog }>(
@@ -37,24 +49,17 @@ export function ShipmentList() {
     organization ? `${freightRoot(organization.id)}/shipments?${queryParams.toString()}` : null
   );
 
-  if (!organization) return <NoOrganization />;
-  if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
-  if (!catalogRes.data) return <Loading />;
-
-  const catalog = catalogRes.data.data;
-  const shipments = shipmentsRes.data?.data || [];
-
   const getModeIcon = (mode: string) => {
     switch (mode) {
       case "ocean_fcl":
       case "ocean_lcl":
-        return <Ship size={15} className="text-blue-600" />;
+        return <Ship size={14} className="text-blue-600" />;
       case "air":
-        return <Plane size={15} className="text-sky-600" />;
+        return <Plane size={14} className="text-sky-600" />;
       case "multimodal":
-        return <Layers size={15} className="text-purple-600" />;
+        return <Layers size={14} className="text-purple-600" />;
       default:
-        return <Truck size={15} className="text-emerald-600" />;
+        return <Truck size={14} className="text-emerald-600" />;
     }
   };
 
@@ -89,152 +94,271 @@ export function ShipmentList() {
     }
   };
 
+  // AG Grid Column Definitions
+  const columnDefs = useMemo<ColDef<Shipment>[]>(
+    () => [
+      {
+        field: "shipment_number",
+        headerName: "Shipment & Reference",
+        minWidth: 190,
+        pinned: "left",
+        cellRenderer: (params: CustomCellRendererProps<Shipment>) => {
+          const s = params.data;
+          if (!s) return null;
+          return (
+            <div className="flex flex-col justify-center h-full py-0.5 leading-tight">
+              <Link
+                href={`/freight/shipments/${s.id}`}
+                className="text-xs font-bold text-blue-950 hover:underline hover:text-blue-700 leading-none"
+              >
+                {s.shipment_number}
+              </Link>
+              {s.master_tracking_number && (
+                <span className="text-[10px] text-slate-400 font-mono leading-none mt-1">
+                  B/L: {s.master_tracking_number}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        field: "customer.name",
+        headerName: "Parties",
+        minWidth: 200,
+        cellRenderer: (params: CustomCellRendererProps<Shipment>) => {
+          const s = params.data;
+          if (!s) return null;
+          return (
+            <div className="flex flex-col justify-center h-full py-0.5 leading-tight">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-800 leading-none">
+                <Building2 size={12} className="text-slate-400 shrink-0" />
+                <span className="truncate">{s.customer?.name || `Customer #${s.customer_id}`}</span>
+              </div>
+              {s.carrier && (
+                <div className="text-[10px] text-slate-400 mt-1 leading-none truncate">
+                  Carrier: {s.carrier.name}
+                </div>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Route",
+        minWidth: 220,
+        valueGetter: (params) => {
+          const s = params.data;
+          if (!s) return "";
+          return `${s.origin_location?.name || s.origin_location_id} to ${s.destination_location?.name || s.destination_location_id}`;
+        },
+        cellRenderer: (params: CustomCellRendererProps<Shipment>) => {
+          const s = params.data;
+          if (!s) return null;
+          return (
+            <div className="flex flex-col justify-center h-full py-0.5 leading-tight">
+              <div className="flex items-center gap-1 text-xs font-medium text-slate-800 leading-none">
+                <span className="truncate">{s.origin_location?.name || `Loc #${s.origin_location_id}`}</span>
+                <ArrowRight size={11} className="text-slate-400 shrink-0" />
+                <span className="truncate">{s.destination_location?.name || `Loc #${s.destination_location_id}`}</span>
+              </div>
+              <div className="text-[10px] text-slate-400 font-mono mt-1 leading-none">
+                {s.origin_location?.country_code} &rarr; {s.destination_location?.country_code}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        field: "transport_mode",
+        headerName: "Mode",
+        width: 140,
+        cellRenderer: (params: CustomCellRendererProps<Shipment>) => {
+          const s = params.data;
+          if (!s) return null;
+          return (
+            <div className="flex items-center gap-1.5 h-full text-xs capitalize text-slate-700">
+              {getModeIcon(s.transport_mode)}
+              <span>{s.transport_mode.replace(/_/g, " ")}</span>
+            </div>
+          );
+        },
+      },
+      {
+        field: "status",
+        headerName: "Operational Status",
+        width: 150,
+        floatingFilter: false,
+        cellRenderer: (params: CustomCellRendererProps<Shipment>) => {
+          const s = params.data;
+          if (!s) return null;
+          return <div className="flex items-center h-full">{getStatusBadge(s.status)}</div>;
+        },
+      },
+      {
+        field: "customs_status",
+        headerName: "Customs",
+        width: 150,
+        floatingFilter: false,
+        cellRenderer: (params: CustomCellRendererProps<Shipment>) => {
+          const s = params.data;
+          if (!s) return null;
+          return <div className="flex items-center h-full">{getCustomsBadge(s.customs_status)}</div>;
+        },
+      },
+      {
+        field: "created_at",
+        headerName: "Created",
+        width: 120,
+        valueFormatter: (params) => {
+          if (!params.value) return "—";
+          return new Date(params.value).toLocaleDateString();
+        },
+      },
+      {
+        headerName: "Action",
+        width: 120,
+        pinned: "right",
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: CustomCellRendererProps<Shipment>) => {
+          const s = params.data;
+          if (!s) return null;
+          return (
+            <div className="flex items-center justify-end h-full">
+              <Link
+                href={`/freight/shipments/${s.id}`}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-blue-900 hover:text-blue-700 hover:underline"
+              >
+                Timeline <ArrowRight size={11} />
+              </Link>
+            </div>
+          );
+        },
+      },
+    ],
+    []
+  );
+
+  if (!organization) return <NoOrganization />;
+  if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
+  if (!catalogRes.data) return <Loading />;
+
+  const catalog = catalogRes.data.data;
+  const rawShipments = shipmentsRes.data?.data || [];
+
+  // Filter in-memory for mode and customs if selected
+  const shipments = rawShipments
+    .filter((s) => (modeFilter === "all" ? true : s.transport_mode === modeFilter))
+    .filter((s) => (customsFilter === "all" ? true : s.customs_status === customsFilter));
+
   return (
-    <div>
-      <PageHeading
-        eyebrow="Freight Operations"
-        title="Shipments & Multimodal Tracking"
-        description="Monitor multimodal cargo movements, transit legs, milestones, and cross-company participants."
-        action={can("freight.manage") ? <NewShipmentDialog catalog={catalog} onCreated={shipmentsRes.reload} /> : null}
+    <>
+      {/* Vektor TMS Flexible Top Header & Sub-Header Toolbar */}
+      <WorkspaceHeaderSlot
+        fullWidth={true}
+        title="Shipments"
+        icon={Package}
+        tabs={[
+          { id: "all", label: "Default / All", count: rawShipments.length },
+          { id: "planned", label: "Planning", icon: Package },
+          { id: "dispatched", label: "Dispatched", icon: Truck },
+          { id: "in_transit", label: "In Transit", icon: Ship },
+          { id: "delivered", label: "Delivered" },
+        ]}
+        activeTab={statusFilter}
+        onTabChange={setStatusFilter}
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search reference, B/L, partner..."
+        primaryAction={
+          can("freight.manage") ? (
+            <NewShipmentDialog catalog={catalog} onCreated={shipmentsRes.reload} />
+          ) : null
+        }
+        subHeader={
+          <>
+            <div className="flex items-center gap-2 flex-wrap">
+              <DateRangePill />
+              <FilterPill
+                label="Status"
+                value={statusFilter}
+                options={[
+                  { value: "all", label: "All Movements" },
+                  { value: "planned", label: "Planned" },
+                  { value: "dispatched", label: "Dispatched" },
+                  { value: "in_transit", label: "In Transit" },
+                  { value: "delivered", label: "Delivered" },
+                ]}
+                onChange={setStatusFilter}
+              />
+              <FilterPill
+                label="Mode"
+                value={modeFilter}
+                options={[
+                  { value: "all", label: "All Modes" },
+                  { value: "road", label: "Road Freight" },
+                  { value: "ocean_fcl", label: "Ocean FCL" },
+                  { value: "ocean_lcl", label: "Ocean LCL" },
+                  { value: "air", label: "Air Cargo" },
+                  { value: "multimodal", label: "Multimodal" },
+                ]}
+                onChange={setModeFilter}
+              />
+              <FilterPill
+                label="Customs"
+                value={customsFilter}
+                options={[
+                  { value: "all", label: "All Compliance" },
+                  { value: "cleared", label: "Customs Cleared" },
+                  { value: "under_inspection", label: "Under Inspection" },
+                  { value: "docs_pending", label: "Docs Pending" },
+                ]}
+                onChange={setCustomsFilter}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <SortPill
+                value={sort}
+                options={[
+                  { value: "latest", label: "Latest by origin" },
+                  { value: "departure", label: "Scheduled departure" },
+                  { value: "reference", label: "Reference number" },
+                ]}
+                onChange={setSort}
+              />
+              <ViewSettingsButton />
+            </div>
+          </>
+        }
       />
 
-      {/* Filter Tabs & Search */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/80 w-full sm:w-auto">
-          {[
-            { id: "all", label: "All Movements" },
-            { id: "planned", label: "Planned" },
-            { id: "dispatched", label: "Dispatched" },
-            { id: "in_transit", label: "In Transit" },
-            { id: "delivered", label: "Delivered" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                statusFilter === tab.id
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="relative w-full sm:w-72">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search reference, B/L, partner..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 text-sm"
-          />
-        </div>
-      </div>
-
+      {/* Main Content: Full-Bleed AG Grid Table */}
       {!shipmentsRes.data && !shipmentsRes.error ? (
         <Loading />
       ) : shipments.length === 0 ? (
-        <Empty
-          title="No shipments found"
-          description={
-            search || statusFilter !== "all"
-              ? "Try adjusting your filters or search query."
-              : "Register your first operational shipment to begin tracking cargo, multimodal legs, and milestones."
-          }
-          action={can("freight.manage") ? <NewShipmentDialog catalog={catalog} onCreated={shipmentsRes.reload} /> : null}
-        />
+        <div className="p-6">
+          <Empty
+            title="No shipments found"
+            description={
+              search || statusFilter !== "all"
+                ? "Try adjusting your filters or search query."
+                : "Register your first operational shipment to begin tracking cargo, multimodal legs, and milestones."
+            }
+            action={can("freight.manage") ? <NewShipmentDialog catalog={catalog} onCreated={shipmentsRes.reload} /> : null}
+          />
+        </div>
       ) : (
-        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50/80 border-b text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="px-5 py-3.5">Shipment & Reference</th>
-                  <th className="px-4 py-3.5">Parties</th>
-                  <th className="px-4 py-3.5">Route</th>
-                  <th className="px-4 py-3.5">Mode</th>
-                  <th className="px-4 py-3.5">Operational Status</th>
-                  <th className="px-4 py-3.5">Customs</th>
-                  <th className="px-5 py-3.5 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {shipments.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/60 transition-colors group">
-                    <td className="px-5 py-4">
-                      <Link
-                        href={`/freight/shipments/${s.id}`}
-                        className="font-semibold text-primary hover:underline flex items-center gap-1.5"
-                      >
-                        {s.shipment_number}
-                      </Link>
-                      {s.master_tracking_number && (
-                        <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                          B/L: {s.master_tracking_number}
-                        </p>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1.5 text-foreground font-medium">
-                        <Building2 size={14} className="text-muted-foreground shrink-0" />
-                        <span className="truncate max-w-[160px]">{s.customer?.name || "—"}</span>
-                      </div>
-                      {s.carrier && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[160px]">
-                          Carrier: {s.carrier.name}
-                        </p>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <span className="font-medium text-foreground">
-                          {s.origin_location?.city || s.origin_location?.name || "Origin"}
-                        </span>
-                        <ArrowRight size={12} className="text-muted-foreground" />
-                        <span className="font-medium text-foreground">
-                          {s.destination_location?.city || s.destination_location?.name || "Destination"}
-                        </span>
-                      </div>
-                      {(s.origin_location?.country_code || s.destination_location?.country_code) && (
-                        <span className="text-[11px] text-muted-foreground mt-0.5 block">
-                          {s.origin_location?.country_code} → {s.destination_location?.country_code}
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1.5">
-                        {getModeIcon(s.transport_mode)}
-                        <span className="capitalize text-xs font-medium text-slate-700">
-                          {s.transport_mode.replace("_", " ")}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-4">{getStatusBadge(s.status)}</td>
-
-                    <td className="px-4 py-4">{getCustomsBadge(s.customs_status) || <span className="text-xs text-muted-foreground">—</span>}</td>
-
-                    <td className="px-5 py-4 text-right">
-                      <Link
-                        href={`/freight/shipments/${s.id}`}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80"
-                      >
-                        View Timeline
-                        <ArrowRight size={13} />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        /* Vektor-Grade Full-Screen AG Grid */
+        <div className="flex-1 min-h-0 w-full h-full flex flex-col">
+          <MekongDataGrid<Shipment>
+            rowData={shipments}
+            columnDefs={columnDefs}
+            fullScreen={true}
+            quickFilterPlaceholder="Quick search in shipments..."
+          />
         </div>
       )}
-    </div>
+    </>
   );
 }

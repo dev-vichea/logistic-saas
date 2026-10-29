@@ -6,7 +6,6 @@ use App\Modules\Audit\Audit;
 use App\Modules\Organizations\Organization;
 use App\Modules\Organizations\OrganizationActions;
 use App\Modules\Organizations\OrganizationContext;
-use Illuminate\Support\Str;
 
 final class FreightActions
 {
@@ -232,10 +231,10 @@ final class FreightActions
             $data['created_by_user_id'] = auth()->id();
             $data['occurred_at'] = $data['occurred_at'] ?? now();
 
-            if (!empty($data['location_id'])) {
+            if (! empty($data['location_id'])) {
                 $organization->locations()->findOrFail($data['location_id']);
             }
-            if (!empty($data['shipment_leg_id'])) {
+            if (! empty($data['shipment_leg_id'])) {
                 $shipment->legs()->findOrFail($data['shipment_leg_id']);
             }
 
@@ -328,32 +327,32 @@ final class FreightActions
     {
         $partnerFields = ['customer_id', 'shipper_id', 'consignee_id', 'carrier_id', 'business_partner_id'];
         foreach ($partnerFields as $field) {
-            if (!empty($data[$field])) {
+            if (! empty($data[$field])) {
                 $organization->partners()->findOrFail($data[$field]);
             }
         }
 
         $locationFields = ['origin_location_id', 'destination_location_id', 'location_id'];
         foreach ($locationFields as $field) {
-            if (!empty($data[$field])) {
+            if (! empty($data[$field])) {
                 $organization->locations()->findOrFail($data[$field]);
             }
         }
 
-        if (!empty($data['freight_request_id'])) {
+        if (! empty($data['freight_request_id'])) {
             $organization->freightRequests()->findOrFail($data['freight_request_id']);
         }
-        if (!empty($data['quotation_id'])) {
+        if (! empty($data['quotation_id'])) {
             $organization->quotations()->findOrFail($data['quotation_id']);
         }
-        if (!empty($data['booking_id'])) {
+        if (! empty($data['booking_id'])) {
             $organization->bookings()->findOrFail($data['booking_id']);
         }
     }
 
     private function generateNumber(?string $explicit, string $prefix, $query, string $column = 'request_number'): string
     {
-        if (!empty(trim((string) $explicit))) {
+        if (! empty(trim((string) $explicit))) {
             return trim($explicit);
         }
 

@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Freight\Booking;
-use App\Modules\Freight\FreightRequest;
 use App\Modules\Freight\Quotation;
 use App\Modules\Freight\Shipment;
 use App\Modules\Locations\Location;
@@ -19,12 +18,19 @@ class FreightManagementTest extends TestCase
     use RefreshDatabase;
 
     private User $ownerA;
+
     private User $ownerB;
+
     private Organization $orgA;
+
     private Organization $orgB;
+
     private BusinessPartner $customerA;
+
     private BusinessPartner $carrierA;
+
     private Location $originA;
+
     private Location $destA;
 
     protected function setUp(): void

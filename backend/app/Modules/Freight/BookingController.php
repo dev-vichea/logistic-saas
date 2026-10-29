@@ -32,8 +32,8 @@ class BookingController
             $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $request->query('q')).'%';
             $query->where(function (Builder $b) use ($pattern) {
                 $b->orWhere('booking_number', 'ilike', $pattern)
-                  ->orWhere('customer_reference', 'ilike', $pattern)
-                  ->orWhereHas('customer', fn ($c) => $c->where('name', 'ilike', $pattern));
+                    ->orWhere('customer_reference', 'ilike', $pattern)
+                    ->orWhereHas('customer', fn ($c) => $c->where('name', 'ilike', $pattern));
             });
         }
 

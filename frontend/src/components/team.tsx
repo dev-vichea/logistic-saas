@@ -20,12 +20,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetBody,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import {
   PageHeading,
   NoOrganization,
@@ -225,7 +227,7 @@ export function Team() {
           ) : undefined
         }
       />
-      <div className="mb-7 flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50/40 px-5 py-4">
+      <div className="mb-7 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/40 px-5 py-4">
         <ShieldCheck size={19} className="mt-0.5 shrink-0 text-primary" />
         <div>
           <p className="text-xs font-medium">
@@ -439,44 +441,51 @@ export function Team() {
           onChange={setInvitePage}
         />
       )}
-      <Dialog
+      <Sheet
         open={manage && (inviteOpen || !!editing)}
         onOpenChange={(value) => {
           if (!value) close();
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editing ? "Edit team member" : "Invite a teammate"}
-            </DialogTitle>
-            <DialogDescription>
-              {editing
-                ? "Update this member’s access and department."
-                : `Send an invitation to join ${org.name}. The link expires in 7 days.`}
-            </DialogDescription>
-          </DialogHeader>
-          <ErrorBox message={error || departmentsError} />
-          <form onSubmit={save} className="space-y-5">
-            {!editing && (
-              <div className="space-y-2">
-                <Label htmlFor="invite-email">Email address</Label>
-                <Input
-                  id="invite-email"
-                  name="email"
-                  type="email"
-                  placeholder="teammate@company.com"
-                  required
-                  maxLength={254}
-                />
-              </div>
-            )}
-            {roleFields}
-            <div className="flex justify-end gap-3 pt-2">
+        <SheetContent side="right" size="default" className="p-0">
+          <form onSubmit={save} className="flex h-full flex-col">
+            <SheetHeader>
+              <SheetTitle>
+                {editing ? "Edit team member" : "Invite a teammate"}
+              </SheetTitle>
+              <SheetDescription>
+                {editing
+                  ? "Update this member’s access and department."
+                  : `Send an invitation to join ${org.name}. The link expires in 7 days.`}
+              </SheetDescription>
+            </SheetHeader>
+            <SheetBody className="space-y-5">
+              <ErrorBox message={error || departmentsError} />
+              {!editing && (
+                <div className="space-y-2">
+                  <Label htmlFor="invite-email">Email address</Label>
+                  <Input
+                    id="invite-email"
+                    name="email"
+                    type="email"
+                    placeholder="teammate@company.com"
+                    required
+                    maxLength={254}
+                    className="bg-white"
+                  />
+                </div>
+              )}
+              {roleFields}
+            </SheetBody>
+            <SheetFooter>
               <Button type="button" variant="outline" onClick={close}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={busy}>
+              <Button
+                type="submit"
+                disabled={busy}
+                className="bg-blue-950 hover:bg-blue-900 text-white font-semibold shadow-2xs"
+              >
                 {busy ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
@@ -484,10 +493,10 @@ export function Team() {
                 )}{" "}
                 {editing ? "Save changes" : "Send invitation"}
               </Button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

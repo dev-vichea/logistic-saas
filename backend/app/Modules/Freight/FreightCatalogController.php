@@ -9,10 +9,12 @@ class FreightCatalogController
 {
     public function index(Request $request): array
     {
-        OrganizationContext::from($request)->authorize('freight.view');
+        $ctx = OrganizationContext::from($request);
+        $ctx->authorize('freight.view');
 
         return [
             'data' => [
+                'locations' => $ctx->organization->locations()->select(['id', 'name', 'type', 'city', 'country_code'])->get(),
                 'transport_modes' => [
                     ['value' => 'road', 'label' => 'Road Freight (FTL / LTL)'],
                     ['value' => 'ocean_fcl', 'label' => 'Ocean Freight (FCL)'],

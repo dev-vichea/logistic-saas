@@ -93,7 +93,7 @@ export function NotesField({
 export function PartnerStatus({ archived }: { archived: boolean }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-medium ${archived ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-primary"}`}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-medium ${archived ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-primary"}`}
     >
       <span
         className={`size-1.5 rounded-full ${archived ? "bg-amber-500" : "bg-primary"}`}

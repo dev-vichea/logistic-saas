@@ -108,7 +108,7 @@ export function PartnerDetail({ id }: { id: string }) {
       )}
       <section className="panel mb-6 flex flex-wrap items-center justify-between gap-5 p-6">
         <div className="flex items-center gap-4">
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-emerald-50 text-primary">
+          <span className="flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-primary">
             <Building2 size={26} />
           </span>
           <div>

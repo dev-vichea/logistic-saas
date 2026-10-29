@@ -24,14 +24,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetBody,
+  SheetFooter,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { api, errorMessage } from "@/lib/api";
 
 export function ShipmentDetail({ shipmentId }: { shipmentId: number }) {
@@ -144,119 +153,132 @@ export function ShipmentDetail({ shipmentId }: { shipmentId: number }) {
 
           <div className="flex items-center gap-3">
             {can("freight.manage") && (
-              <Dialog open={milestoneOpen} onOpenChange={setMilestoneOpen}>
-                <DialogTrigger asChild>
-                  <Button className="gap-2 shadow-sm">
+              <Sheet open={milestoneOpen} onOpenChange={setMilestoneOpen}>
+                <SheetTrigger asChild>
+                  <Button className="gap-2 shadow-2xs">
                     <Plus size={16} />
                     Record Milestone
                   </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Record Operational Milestone</DialogTitle>
-                    <DialogDescription>
-                      Log milestone updates, departures, customs clearance events, or delivery notes.
-                    </DialogDescription>
-                  </DialogHeader>
+                </SheetTrigger>
+                <SheetContent side="right" size="default" className="p-0">
+                  <form onSubmit={handleMilestoneSubmit} className="flex h-full flex-col">
+                    <SheetHeader>
+                      <SheetTitle>Record Operational Milestone</SheetTitle>
+                      <SheetDescription>
+                        Log milestone updates, departures, customs clearance events, or delivery notes.
+                      </SheetDescription>
+                    </SheetHeader>
 
-                  {milestoneError && (
-                    <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 border border-red-200">
-                      {milestoneError}
-                    </div>
-                  )}
+                    <SheetBody className="space-y-4">
+                      {milestoneError && (
+                        <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600 border border-red-200">
+                          {milestoneError}
+                        </div>
+                      )}
 
-                  <form onSubmit={handleMilestoneSubmit} className="space-y-4 pt-2">
-                    <div>
-                      <Label htmlFor="milestone_preset">Milestone Event *</Label>
-                      <select
-                        id="milestone_preset"
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                        value={milestoneForm.code}
-                        onChange={(e) => {
-                          const preset = catalog.milestone_presets.find((p) => p.code === e.target.value);
-                          setMilestoneForm({
-                            ...milestoneForm,
-                            code: e.target.value,
-                            title: preset?.title || e.target.value,
-                          });
-                        }}
-                      >
-                        {catalog.milestone_presets.map((p) => (
-                          <option key={p.code} value={p.code}>
-                            {p.title}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="milestone_title">Milestone Title *</Label>
-                      <Input
-                        id="milestone_title"
-                        required
-                        value={milestoneForm.title}
-                        onChange={(e) => setMilestoneForm({ ...milestoneForm, title: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="occurred_at">Occurred Timestamp *</Label>
+                        <Label htmlFor="milestone_preset">Milestone Event *</Label>
+                        <Select
+                          value={milestoneForm.code}
+                          onValueChange={(val) => {
+                            const preset = catalog.milestone_presets.find((p) => p.code === val);
+                            setMilestoneForm({
+                              ...milestoneForm,
+                              code: val,
+                              title: preset?.title || val,
+                            });
+                          }}
+                        >
+                          <SelectTrigger id="milestone_preset" className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {catalog.milestone_presets.map((p) => (
+                              <SelectItem key={p.code} value={p.code}>
+                                {p.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="milestone_title">Milestone Title *</Label>
                         <Input
-                          id="occurred_at"
-                          type="datetime-local"
+                          id="milestone_title"
                           required
-                          value={milestoneForm.occurred_at}
-                          onChange={(e) => setMilestoneForm({ ...milestoneForm, occurred_at: e.target.value })}
+                          value={milestoneForm.title}
+                          onChange={(e) => setMilestoneForm({ ...milestoneForm, title: e.target.value })}
+                          className="mt-1 bg-white text-sm"
                         />
                       </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="occurred_at">Occurred Timestamp *</Label>
+                          <Input
+                            id="occurred_at"
+                            type="datetime-local"
+                            required
+                            value={milestoneForm.occurred_at}
+                            onChange={(e) => setMilestoneForm({ ...milestoneForm, occurred_at: e.target.value })}
+                            className="mt-1 bg-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="location_name">Location Name / Terminal</Label>
+                          <Input
+                            id="location_name"
+                            placeholder="e.g. Sihanoukville Port Gate 2"
+                            value={milestoneForm.location_name}
+                            onChange={(e) => setMilestoneForm({ ...milestoneForm, location_name: e.target.value })}
+                            className="mt-1 bg-white text-sm"
+                          />
+                        </div>
+                      </div>
+
                       <div>
-                        <Label htmlFor="location_name">Location Name / Terminal</Label>
-                        <Input
-                          id="location_name"
-                          placeholder="e.g. Sihanoukville Port Gate 2"
-                          value={milestoneForm.location_name}
-                          onChange={(e) => setMilestoneForm({ ...milestoneForm, location_name: e.target.value })}
+                        <Label htmlFor="description">Event Notes / Description</Label>
+                        <Textarea
+                          id="description"
+                          rows={3}
+                          placeholder="Driver remarks, container seal verification, inspector notes..."
+                          value={milestoneForm.description}
+                          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMilestoneForm({ ...milestoneForm, description: e.target.value })}
+                          className="mt-1 bg-white text-xs"
                         />
                       </div>
-                    </div>
 
-                    <div>
-                      <Label htmlFor="description">Event Notes / Description</Label>
-                      <Textarea
-                        id="description"
-                        rows={3}
-                        placeholder="Driver remarks, container seal verification, inspector notes..."
-                        value={milestoneForm.description}
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMilestoneForm({ ...milestoneForm, description: e.target.value })}
-                      />
-                    </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <Checkbox
+                          id="is_exception"
+                          checked={milestoneForm.is_exception}
+                          onCheckedChange={(checked) =>
+                            setMilestoneForm({ ...milestoneForm, is_exception: !!checked })
+                          }
+                        />
+                        <Label htmlFor="is_exception" className="text-xs text-slate-600 font-normal cursor-pointer">
+                          Flag as operational exception / delay
+                        </Label>
+                      </div>
+                    </SheetBody>
 
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="is_exception"
-                        checked={milestoneForm.is_exception}
-                        onChange={(e) => setMilestoneForm({ ...milestoneForm, is_exception: e.target.checked })}
-                        className="rounded border-slate-300"
-                      />
-                      <Label htmlFor="is_exception" className="text-xs text-muted-foreground font-normal">
-                        Flag as operational exception / delay
-                      </Label>
-                    </div>
-
-                    <DialogFooter className="pt-2">
+                    <SheetFooter>
                       <Button type="button" variant="outline" onClick={() => setMilestoneOpen(false)}>
                         Cancel
                       </Button>
-                      <Button type="submit" disabled={savingMilestone}>
+                      <Button
+                        type="submit"
+                        disabled={savingMilestone}
+                        className="bg-blue-950 hover:bg-blue-900 text-white font-semibold shadow-2xs"
+                      >
                         {savingMilestone && <Loader2 size={16} className="mr-2 animate-spin" />}
                         Save Milestone
                       </Button>
-                    </DialogFooter>
+                    </SheetFooter>
                   </form>
-                </DialogContent>
-              </Dialog>
+                </SheetContent>
+              </Sheet>
             )}
           </div>
         </div>
