@@ -28,9 +28,10 @@ import { MekongDataGrid } from "@/components/ui/data-grid";
 import { NewRequestDialog } from "./new-request-dialog";
 import {
   WorkspaceHeaderSlot,
-  FilterPill,
-  DateRangePill,
-  SortPill,
+  FloatingFilterSelect,
+  FloatingDateFilter,
+  ViewPresetSelector,
+  FilterResetButton,
   ViewSettingsButton,
 } from "@/components/navigation/header-context";
 
@@ -39,8 +40,12 @@ export function FreightRequestList() {
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [modeFilter, setModeFilter] = useState<string>("all");
+  const [incotermFilter, setIncotermFilter] = useState<string>("all");
+  const [shipperFilter, setShipperFilter] = useState<string>("all");
+  const [originFilter, setOriginFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [activeView, setActiveView] = useState<string>("default");
   const [segment, setSegment] = useState<string>("inbound");
-  const [sort, setSort] = useState<string>("latest");
 
   const catalogRes = useResource<{ data: FreightCatalog }>(
     organization ? `${freightRoot(organization.id)}/catalog` : null
@@ -84,8 +89,8 @@ export function FreightRequestList() {
   };
 
   // AG Grid Column Definitions with Vektor TMS Tinted Group Headers (100% Single-Line)
-  const columnDefs = useMemo<(ColDef<FreightRequest> | ColGroupDef<FreightRequest>)[]>(
-    () => [
+  const columnDefs = useMemo<(ColDef<FreightRequest> | ColGroupDef<FreightRequest>)[]>(() => {
+    const allCols: (ColDef<FreightRequest> | ColGroupDef<FreightRequest>)[] = [
       {
         field: "request_number",
         headerName: "Req ID",
@@ -409,20 +414,115 @@ export function FreightRequestList() {
           );
         },
       },
-    ],
-    []
+    ];
+
+    if (activeView === "commercial") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Req ID", "Shipper", "Service Terms", "Dates & Schedule", "Status", "Actions"].includes(name || "");
+      });
+    }
+    if (activeView === "routing") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Req ID", "Origin Routing", "Destination Routing", "Cargo Specifications", "Dates & Schedule", "Status", "Actions"].includes(name || "");
+      });
+    }
+    return allCols;
+  }, [activeView]);
+
+  const rawRequests = useMemo(
+    () => requestsRes.data?.data || [],
+    [requestsRes.data?.data]
   );
+
+  const shipperOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    rawRequests.forEach((r) => {
+      if (r.customer) {
+        map.set(String(r.customer.id), r.customer.name);
+      }
+    });
+    return Array.from(map.entries()).map(([value, label]) => ({
+      value,
+      label,
+    }));
+  }, [rawRequests]);
+
+  const originOptions = useMemo(() => {
+    const locs = catalogRes.data?.data?.locations;
+    if (!locs) return [];
+    const originLocs = locs.filter(
+      (l) => l.type === "factory" || l.type === "dry_port" || l.type === "warehouse"
+    );
+    const uniqueCities = Array.from(new Set(originLocs.map((l) => l.city).filter(Boolean)));
+    return uniqueCities.map((city) => ({
+      value: city,
+      label: city,
+    }));
+  }, [catalogRes.data?.data?.locations]);
+
+  const incotermOptions = [
+    { value: "FCA", label: "FCA (Free Carrier)" },
+    { value: "FOB", label: "FOB (Free on Board)" },
+    { value: "CIF", label: "CIF (Cost, Insurance & Freight)" },
+    { value: "CIP", label: "CIP (Carriage & Insurance Paid)" },
+    { value: "DDP", label: "DDP (Delivered Duty Paid)" },
+    { value: "EXW", label: "EXW (Ex Works)" },
+    { value: "DAP", label: "DAP (Delivered at Place)" },
+    { value: "CFR", label: "CFR (Cost & Freight)" },
+  ];
+
+  const hasActiveFilters =
+    statusFilter !== "all" ||
+    modeFilter !== "all" ||
+    incotermFilter !== "all" ||
+    shipperFilter !== "all" ||
+    originFilter !== "all" ||
+    dateFilter !== "all" ||
+    search.trim() !== "";
+
+  const resetAllFilters = () => {
+    setStatusFilter("all");
+    setModeFilter("all");
+    setIncotermFilter("all");
+    setShipperFilter("all");
+    setOriginFilter("all");
+    setDateFilter("all");
+    setSearch("");
+  };
+
+  const requests = useMemo(() => {
+    return rawRequests.filter((r) => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (modeFilter !== "all" && r.transport_mode !== modeFilter) return false;
+      if (incotermFilter !== "all" && r.incoterm !== incotermFilter) return false;
+      if (shipperFilter !== "all" && String(r.customer_id) !== shipperFilter) return false;
+      if (originFilter !== "all") {
+        const originCity = r.origin_location?.city?.toLowerCase() || "";
+        if (!originCity.includes(originFilter.toLowerCase())) return false;
+      }
+      if (dateFilter !== "all" && r.target_readiness_date) {
+        const d = new Date(r.target_readiness_date);
+        const now = new Date();
+        if (dateFilter === "today") {
+          if (d.toDateString() !== now.toDateString()) return false;
+        } else if (dateFilter === "this_week") {
+          const diff = (d.getTime() - now.getTime()) / (1000 * 3600 * 24);
+          if (diff < -2 || diff > 7) return false;
+        } else if (dateFilter === "this_month") {
+          if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return false;
+        }
+      }
+      return true;
+    });
+  }, [rawRequests, statusFilter, modeFilter, incotermFilter, shipperFilter, originFilter, dateFilter]);
 
   if (!organization) return <NoOrganization />;
   if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
   if (!catalogRes.data) return <Loading />;
 
   const catalog = catalogRes.data.data;
-  const rawRequests = requestsRes.data?.data || [];
-
-  const requests = rawRequests.filter((r) =>
-    modeFilter === "all" ? true : r.transport_mode === modeFilter
-  );
 
   return (
     <>
@@ -456,25 +556,26 @@ export function FreightRequestList() {
         }
         subHeader={
           <>
-            <div className="flex items-center gap-2 flex-wrap">
-              <DateRangePill />
-              <FilterPill
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <FloatingFilterSelect
                 label="Status"
                 value={statusFilter}
+                allLabel="All Statuses"
                 options={[
-                  { value: "all", label: "All Requests" },
                   { value: "submitted", label: "Submitted" },
                   { value: "reviewing", label: "Reviewing" },
                   { value: "quoted", label: "Quoted" },
                   { value: "converted", label: "Booked" },
+                  { value: "cancelled", label: "Cancelled" },
                 ]}
                 onChange={setStatusFilter}
+                minWidth="min-w-[115px]"
               />
-              <FilterPill
+              <FloatingFilterSelect
                 label="Mode"
                 value={modeFilter}
+                allLabel="All Modes"
                 options={[
-                  { value: "all", label: "All Modes" },
                   { value: "ocean_fcl", label: "Ocean FCL" },
                   { value: "ocean_lcl", label: "Ocean LCL" },
                   { value: "air", label: "Air Cargo" },
@@ -482,19 +583,51 @@ export function FreightRequestList() {
                   { value: "multimodal", label: "Multimodal" },
                 ]}
                 onChange={setModeFilter}
+                minWidth="min-w-[115px]"
               />
+              <FloatingFilterSelect
+                label="Incoterm"
+                value={incotermFilter}
+                allLabel="All Terms"
+                options={incotermOptions}
+                onChange={setIncotermFilter}
+                minWidth="min-w-[110px]"
+              />
+              {shipperOptions.length > 0 && (
+                <FloatingFilterSelect
+                  label="Shipper"
+                  value={shipperFilter}
+                  allLabel="All Shippers"
+                  options={shipperOptions}
+                  onChange={setShipperFilter}
+                  minWidth="min-w-[130px]"
+                />
+              )}
+              {originOptions.length > 0 && (
+                <FloatingFilterSelect
+                  label="Origin"
+                  value={originFilter}
+                  allLabel="All Origins"
+                  options={originOptions}
+                  onChange={setOriginFilter}
+                  minWidth="min-w-[115px]"
+                />
+              )}
+              <FloatingDateFilter
+                label="Readiness"
+                value={dateFilter}
+                onChange={setDateFilter}
+              />
+              {hasActiveFilters && (
+                <FilterResetButton onReset={resetAllFilters} />
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <SortPill
-                value={sort}
-                options={[
-                  { value: "latest", label: "Latest by intake" },
-                  { value: "readiness", label: "Target readiness" },
-                  { value: "weight", label: "Cargo weight" },
-                ]}
-                onChange={setSort}
+            <div className="flex items-center gap-2 shrink-0">
+              <ViewPresetSelector
+                activeView={activeView}
+                onSelectView={setActiveView}
               />
-              <ViewSettingsButton />
+              <ViewSettingsButton onClick={resetAllFilters} />
             </div>
           </>
         }

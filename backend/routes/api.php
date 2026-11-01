@@ -22,6 +22,8 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
         Route::post('organizations', [OrganizationController::class, 'store'])->middleware('throttle:organizations');
         Route::post('invitations/accept', [TeamController::class, 'accept'])->middleware('throttle:invitations');
         Route::prefix('organizations/{organization}')->whereNumber('organization')->middleware(ResolveOrganization::class)->group(function () {
+            require __DIR__.'/material-requests.php';
+            require __DIR__.'/purchase-orders.php';
             require __DIR__.'/partners.php';
             require __DIR__.'/freight.php';
             require __DIR__.'/transportation.php';

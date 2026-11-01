@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { UsersRound, Phone, CheckCircle2, Clock } from "lucide-react";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, ColGroupDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { useWorkspace } from "@/components/workspace";
 import { NoOrganization, Loading, ErrorBox, Empty } from "@/components/common";
@@ -14,8 +14,10 @@ import { MekongDataGrid } from "@/components/ui/data-grid";
 import { NewDriverDialog } from "./new-driver-dialog";
 import {
   WorkspaceHeaderSlot,
-  FilterPill,
-  SortPill,
+  FloatingFilterSelect,
+  FloatingDateFilter,
+  ViewPresetSelector,
+  FilterResetButton,
   ViewSettingsButton,
 } from "@/components/navigation/header-context";
 
@@ -24,7 +26,8 @@ export function DriverList() {
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [licenseFilter, setLicenseFilter] = useState<string>("all");
-  const [sort, setSort] = useState<string>("latest");
+  const [expiryFilter, setExpiryFilter] = useState<string>("all");
+  const [activeView, setActiveView] = useState<string>("default");
 
   const catalogRes = useResource<{ data: TransportationCatalog }>(
     organization ? `${transportRoot(organization.id)}/catalog` : null
@@ -37,6 +40,40 @@ export function DriverList() {
   const driversRes = useResource<Paginated<Driver>>(
     organization ? `${transportRoot(organization.id)}/drivers?${queryParams.toString()}` : null
   );
+
+  const rawDrivers = useMemo(
+    () => driversRes.data?.data || [],
+    [driversRes.data?.data]
+  );
+
+  const hasActiveFilters =
+    statusFilter !== "all" ||
+    licenseFilter !== "all" ||
+    expiryFilter !== "all" ||
+    search.trim() !== "";
+
+  const resetAllFilters = () => {
+    setStatusFilter("all");
+    setLicenseFilter("all");
+    setExpiryFilter("all");
+    setSearch("");
+  };
+
+  const drivers = useMemo(() => {
+    return rawDrivers.filter((d) => {
+      if (statusFilter !== "all" && d.current_status !== statusFilter) return false;
+      if (licenseFilter !== "all" && d.license_type !== licenseFilter) return false;
+      if (expiryFilter !== "all" && d.license_expires_at) {
+        const expDate = new Date(d.license_expires_at);
+        const today = new Date();
+        const diffDays = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+        if (expiryFilter === "expired" && diffDays >= 0) return false;
+        if (expiryFilter === "30_days" && (diffDays < 0 || diffDays > 30)) return false;
+        if (expiryFilter === "90_days" && (diffDays < 0 || diffDays > 90)) return false;
+      }
+      return true;
+    });
+  }, [rawDrivers, statusFilter, licenseFilter, expiryFilter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -64,81 +101,111 @@ export function DriverList() {
     }
   };
 
-  const columnDefs = useMemo<ColDef<Driver>[]>(
-    () => [
+  // AG Grid Column Definitions with Vektor TMS Tinted Group Headers (100% Single-Line)
+  const columnDefs = useMemo<(ColDef<Driver> | ColGroupDef<Driver>)[]>(() => {
+    const allCols: (ColDef<Driver> | ColGroupDef<Driver>)[] = [
       {
         field: "full_name",
         headerName: "Driver Name",
-        minWidth: 190,
+        width: 175,
         pinned: "left",
         cellRenderer: (params: CustomCellRendererProps<Driver>) => {
           const d = params.data;
           if (!d) return null;
           return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-900 text-xs leading-none">
-                <UsersRound size={13} className="text-slate-400 shrink-0" />
-                <span>{d.full_name}</span>
-              </div>
-              {d.email && (
-                <span className="text-[10px] text-slate-400 font-mono mt-1 leading-none">
-                  {d.email}
+            <div className="flex items-center gap-1.5 font-semibold text-slate-900 text-xs">
+              <UsersRound size={13} className="text-slate-400 shrink-0" />
+              <span>{d.full_name}</span>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Contact & Comms",
+        headerClass: "ag-group-shipper",
+        children: [
+          {
+            field: "phone",
+            headerName: "Phone Number",
+            width: 150,
+            cellRenderer: (params: CustomCellRendererProps<Driver>) => {
+              const d = params.data;
+              if (!d) return null;
+              return (
+                <div className="flex items-center gap-1.5 h-full text-xs font-mono text-slate-700">
+                  <Phone size={12} className="text-slate-400 shrink-0" />
+                  <span>{d.phone}</span>
+                </div>
+              );
+            },
+          },
+          {
+            field: "email",
+            headerName: "Email Address",
+            minWidth: 175,
+            flex: 1.2,
+            cellRenderer: (params: CustomCellRendererProps<Driver>) => {
+              const d = params.data;
+              if (!d?.email) return <span className="text-slate-400 text-xs">—</span>;
+              return <span className="text-xs font-mono text-slate-600 truncate">{d.email}</span>;
+            },
+          },
+        ],
+      },
+      {
+        headerName: "Licensing & Credentials",
+        headerClass: "ag-group-service",
+        children: [
+          {
+            field: "license_type",
+            headerName: "License Class",
+            width: 145,
+            cellRenderer: (params: CustomCellRendererProps<Driver>) => {
+              const d = params.data;
+              if (!d) return null;
+              return <div className="flex items-center h-full">{getLicenseLabel(d.license_type)}</div>;
+            },
+          },
+          {
+            field: "license_number",
+            headerName: "License #",
+            width: 140,
+            cellRenderer: (params: CustomCellRendererProps<Driver>) => {
+              const d = params.data;
+              if (!d) return null;
+              return (
+                <span className="font-mono font-semibold text-slate-900 text-xs uppercase">
+                  {d.license_number}
                 </span>
-              )}
-            </div>
-          );
-        },
+              );
+            },
+          },
+        ],
       },
       {
-        field: "phone",
-        headerName: "Contact Phone",
-        width: 160,
-        cellRenderer: (params: CustomCellRendererProps<Driver>) => {
-          const d = params.data;
-          if (!d) return null;
-          return (
-            <div className="flex items-center gap-1.5 h-full text-xs font-mono text-slate-700">
-              <Phone size={12} className="text-slate-400 shrink-0" />
-              <span>{d.phone}</span>
-            </div>
-          );
-        },
-      },
-      {
-        field: "license_number",
-        headerName: "License #",
-        width: 170,
-        cellRenderer: (params: CustomCellRendererProps<Driver>) => {
-          const d = params.data;
-          if (!d) return null;
-          return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight">
-              <span className="font-mono font-semibold text-slate-900 text-xs uppercase leading-none">
-                {d.license_number}
-              </span>
-              {d.license_expires_at && (
-                <span className="text-[10px] text-slate-400 font-mono mt-1 leading-none">
-                  Exp: {new Date(d.license_expires_at).toLocaleDateString("en-GB")}
+        headerName: "Validity & Expiration",
+        headerClass: "ag-group-schedule",
+        children: [
+          {
+            field: "license_expires_at",
+            headerName: "License Expiry",
+            width: 130,
+            cellRenderer: (params: CustomCellRendererProps<Driver>) => {
+              const d = params.data;
+              if (!d?.license_expires_at) return <span className="text-slate-400 text-xs">—</span>;
+              return (
+                <span className="text-xs font-mono text-slate-600">
+                  {new Date(d.license_expires_at).toLocaleDateString("en-GB")}
                 </span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        field: "license_type",
-        headerName: "License Class",
-        width: 170,
-        cellRenderer: (params: CustomCellRendererProps<Driver>) => {
-          const d = params.data;
-          if (!d) return null;
-          return <div className="flex items-center h-full">{getLicenseLabel(d.license_type)}</div>;
-        },
+              );
+            },
+          },
+        ],
       },
       {
         field: "current_status",
         headerName: "Status",
-        width: 140,
+        width: 135,
         floatingFilter: false,
         cellRenderer: (params: CustomCellRendererProps<Driver>) => {
           const d = params.data;
@@ -146,9 +213,22 @@ export function DriverList() {
           return <div className="flex items-center h-full">{getStatusBadge(d.current_status)}</div>;
         },
       },
-    ],
-    []
-  );
+    ];
+
+    if (activeView === "licensing") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Driver Name", "Licensing & Credentials", "Validity & Expiration", "Status"].includes(name || "");
+      });
+    }
+    if (activeView === "contact") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Driver Name", "Contact & Comms", "Status"].includes(name || "");
+      });
+    }
+    return allCols;
+  }, [activeView]);
 
   if (!organization) return <NoOrganization />;
   if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
@@ -156,12 +236,6 @@ export function DriverList() {
   if (!catalogRes.data) return <Loading />;
 
   const catalog = catalogRes.data.data;
-  const rawDrivers = driversRes.data?.data || [];
-
-  const drivers = rawDrivers.filter((d) => {
-    if (licenseFilter !== "all" && d.license_type !== licenseFilter) return false;
-    return true;
-  });
 
   return (
     <>
@@ -188,29 +262,58 @@ export function DriverList() {
         }
         subHeader={
           <>
-            <div className="flex items-center gap-2 flex-wrap">
-              <FilterPill
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <FloatingFilterSelect
+                label="Status"
+                value={statusFilter}
+                allLabel="All Statuses"
+                options={[
+                  { value: "available", label: "Available" },
+                  { value: "on_trip", label: "On Trip" },
+                  { value: "rest_leave", label: "On Leave" },
+                  { value: "inactive", label: "Inactive" },
+                ]}
+                onChange={setStatusFilter}
+                minWidth="min-w-[115px]"
+              />
+              <FloatingFilterSelect
                 label="License"
                 value={licenseFilter}
+                allLabel="All Classes"
                 options={[
-                  { value: "all", label: "All Classes" },
                   { value: "articulated_trailer", label: "Class E (Trailer)" },
                   { value: "heavy_truck", label: "Class C (Heavy)" },
                   { value: "hazardous_materials", label: "Hazmat" },
                 ]}
                 onChange={setLicenseFilter}
+                minWidth="min-w-[130px]"
               />
-            </div>
-            <div className="flex items-center gap-2">
-              <SortPill
-                value={sort}
+              <FloatingDateFilter
+                label="Expiry"
+                value={expiryFilter}
                 options={[
-                  { value: "latest", label: "Latest registered" },
-                  { value: "name", label: "Driver name" },
+                  { value: "all", label: "All Validity" },
+                  { value: "30_days", label: "Within 30 Days" },
+                  { value: "90_days", label: "Within 90 Days" },
+                  { value: "expired", label: "Expired" },
                 ]}
-                onChange={setSort}
+                onChange={setExpiryFilter}
               />
-              <ViewSettingsButton />
+              {hasActiveFilters && (
+                <FilterResetButton onReset={resetAllFilters} />
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <ViewPresetSelector
+                activeView={activeView}
+                presets={[
+                  { id: "default", label: "Default View", desc: "All columns & credentials" },
+                  { id: "licensing", label: "Licensing & Expiration", desc: "Class, license # & expiry" },
+                  { id: "contact", label: "Crew Contact", desc: "Phone, email & status" },
+                ]}
+                onSelectView={setActiveView}
+              />
+              <ViewSettingsButton onClick={resetAllFilters} />
             </div>
           </>
         }
@@ -224,8 +327,8 @@ export function DriverList() {
           <Empty
             title="No drivers registered"
             description={
-              search || statusFilter !== "all" || licenseFilter !== "all"
-                ? "No drivers match your active query."
+              search || hasActiveFilters
+                ? "No drivers match your active query or filters."
                 : "Register your professional drivers to dispatch them on road transport run-sheets."
             }
             action={can("transport.manage") ? <NewDriverDialog catalog={catalog} onCreated={driversRes.reload} /> : null}

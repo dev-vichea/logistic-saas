@@ -13,6 +13,7 @@ import {
   Boxes,
   Files,
   FileStack,
+  FileText,
   Globe2,
   Landmark,
   ListChecks,
@@ -56,6 +57,22 @@ export const overview: NavigationItem = {
   icon: LayoutDashboard,
   href: "/dashboard",
   description: "Your workspace dashboard and recent activity",
+};
+export const materialRequestsNav: NavigationItem = {
+  id: "material-requests",
+  label: "Material Requests",
+  icon: ClipboardList,
+  href: "/material-requests",
+  permission: "material_requests.view",
+  description: "Request materials and track what is needed",
+};
+export const purchaseOrdersNav: NavigationItem = {
+  id: "purchase-orders",
+  label: "Purchase Orders",
+  icon: FileText,
+  href: "/purchase-orders",
+  permission: "purchase_orders.view",
+  description: "Order requested materials from suppliers",
 };
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -354,6 +371,10 @@ export const navigationGroups: NavigationGroup[] = [
 ];
 export function itemMatchesPath(item: NavigationItem, path: string): boolean {
   if (!item.href) return false;
+  if (item.id === "material-requests")
+    return path === "/material-requests" || path.startsWith("/material-requests/");
+  if (item.id === "purchase-orders")
+    return path === "/purchase-orders" || path.startsWith("/purchase-orders/");
   if (item.id === "partners")
     return path === "/partners" || path.startsWith("/partners/");
   if (item.id === "organizations")
@@ -363,6 +384,10 @@ export function itemMatchesPath(item: NavigationItem, path: string): boolean {
 export function navigationLocation(path: string) {
   if (itemMatchesPath(overview, path))
     return { group: "Workspace", label: overview.label };
+  if (itemMatchesPath(materialRequestsNav, path))
+    return { group: "Workspace", label: materialRequestsNav.label };
+  if (itemMatchesPath(purchaseOrdersNav, path))
+    return { group: "Workspace", label: purchaseOrdersNav.label };
   for (const group of navigationGroups) {
     const item = group.items.find((item) => itemMatchesPath(item, path));
     if (item) return { group: group.label, label: item.label };

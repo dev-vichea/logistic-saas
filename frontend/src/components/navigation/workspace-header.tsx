@@ -592,7 +592,7 @@ export function WorkspaceHeader({
 
       {/* Row 2: Sub-Header / Secondary Filter Toolbar */}
       {config?.subHeader && (
-        <div className="sticky top-16 z-20 flex min-h-11 w-full flex-wrap items-center justify-between border-b border-slate-200/90 bg-white/95 px-4 sm:px-6 py-1.5 backdrop-blur-md gap-2">
+        <div className="sticky top-16 z-20 flex min-h-12 w-full flex-wrap items-center justify-between border-b border-slate-200/90 bg-white/95 px-4 sm:px-6 pt-2.5 pb-2 backdrop-blur-md gap-2.5">
           {config.subHeader}
         </div>
       )}

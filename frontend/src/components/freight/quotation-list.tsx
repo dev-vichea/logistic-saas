@@ -4,12 +4,11 @@ import { useState, useMemo, useCallback } from "react";
 import {
   FileText,
   Building2,
-  ArrowRight,
   CheckCircle2,
   Clock,
   XCircle,
 } from "lucide-react";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, ColGroupDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { useWorkspace } from "@/components/workspace";
 import { NoOrganization, Loading, ErrorBox, Empty } from "@/components/common";
@@ -23,9 +22,10 @@ import { MekongDataGrid } from "@/components/ui/data-grid";
 import { NewQuotationDialog } from "./new-quotation-dialog";
 import {
   WorkspaceHeaderSlot,
-  FilterPill,
-  DateRangePill,
-  SortPill,
+  FloatingFilterSelect,
+  FloatingDateFilter,
+  ViewPresetSelector,
+  FilterResetButton,
   ViewSettingsButton,
 } from "@/components/navigation/header-context";
 
@@ -34,7 +34,9 @@ export function QuotationList() {
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [modeFilter, setModeFilter] = useState<string>("all");
-  const [sort, setSort] = useState<string>("latest");
+  const [customerFilter, setCustomerFilter] = useState<string>("all");
+  const [validityFilter, setValidityFilter] = useState<string>("all");
+  const [activeView, setActiveView] = useState<string>("default");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   const catalogRes = useResource<{ data: FreightCatalog }>(
@@ -50,11 +52,59 @@ export function QuotationList() {
   );
 
   const catalog = catalogRes.data?.data;
-  const rawQuotations = quotationsRes.data?.data || [];
-
-  const quotations = rawQuotations.filter((q) =>
-    modeFilter === "all" ? true : q.transport_mode === modeFilter
+  const rawQuotations = useMemo(
+    () => quotationsRes.data?.data || [],
+    [quotationsRes.data?.data]
   );
+
+  const customerOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    rawQuotations.forEach((q) => {
+      if (q.customer) {
+        map.set(String(q.customer.id), q.customer.name);
+      }
+    });
+    return Array.from(map.entries()).map(([value, label]) => ({
+      value,
+      label,
+    }));
+  }, [rawQuotations]);
+
+  const hasActiveFilters =
+    statusFilter !== "all" ||
+    modeFilter !== "all" ||
+    customerFilter !== "all" ||
+    validityFilter !== "all" ||
+    search.trim() !== "";
+
+  const resetAllFilters = () => {
+    setStatusFilter("all");
+    setModeFilter("all");
+    setCustomerFilter("all");
+    setValidityFilter("all");
+    setSearch("");
+  };
+
+  const quotations = useMemo(() => {
+    return rawQuotations.filter((q) => {
+      if (statusFilter !== "all" && q.status !== statusFilter) return false;
+      if (modeFilter !== "all" && q.transport_mode !== modeFilter) return false;
+      if (customerFilter !== "all" && String(q.customer_id) !== customerFilter) return false;
+      if (validityFilter !== "all" && q.valid_until) {
+        const d = new Date(q.valid_until);
+        const now = new Date();
+        if (validityFilter === "today") {
+          if (d.toDateString() !== now.toDateString()) return false;
+        } else if (validityFilter === "this_week") {
+          const diff = (d.getTime() - now.getTime()) / (1000 * 3600 * 24);
+          if (diff < -1 || diff > 7) return false;
+        } else if (validityFilter === "this_month") {
+          if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return false;
+        }
+      }
+      return true;
+    });
+  }, [rawQuotations, statusFilter, modeFilter, customerFilter, validityFilter]);
 
   const handleStatusUpdate = useCallback(
     async (id: number, status: string) => {
@@ -87,107 +137,163 @@ export function QuotationList() {
     }
   };
 
-  const columnDefs = useMemo<ColDef<Quotation>[]>(
-    () => [
+  // AG Grid Column Definitions with Vektor TMS Tinted Group Headers (100% Single-Line)
+  const columnDefs = useMemo<(ColDef<Quotation> | ColGroupDef<Quotation>)[]>(() => {
+    const allCols: (ColDef<Quotation> | ColGroupDef<Quotation>)[] = [
       {
         field: "quotation_number",
-        headerName: "Quotation # & Revision",
-        minWidth: 190,
+        headerName: "Quote ID",
+        width: 140,
         pinned: "left",
         cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
           const q = params.data;
           if (!q) return null;
           return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight">
-              <div className="flex items-center gap-1.5 leading-none">
-                <span className="font-semibold text-slate-900 font-mono text-xs">{q.quotation_number}</span>
-                <span className="text-[11px] font-mono text-slate-500 font-medium">
-                  R{q.revision}
-                </span>
-              </div>
-              {q.valid_until && (
-                <span className="text-[10px] font-mono text-slate-400 mt-1 leading-none">
-                  Valid until: {new Date(q.valid_until).toLocaleDateString("en-GB")}
-                </span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        field: "customer.name",
-        headerName: "Customer",
-        minWidth: 200,
-        cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
-          const q = params.data;
-          if (!q) return null;
-          return (
-            <div className="flex items-center gap-1.5 h-full text-xs font-medium text-slate-800">
-              <Building2 size={13} className="text-slate-400 shrink-0" />
-              <span className="truncate">{q.customer?.name || `Customer #${q.customer_id}`}</span>
-            </div>
-          );
-        },
-      },
-      {
-        field: "transport_mode",
-        headerName: "Mode & Incoterm",
-        width: 160,
-        cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
-          const q = params.data;
-          if (!q) return null;
-          return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight">
-              <span className="capitalize text-slate-800 font-medium text-xs leading-none">
-                {q.transport_mode.replace(/_/g, " ")}
+            <div className="flex items-center gap-1.5 h-full">
+              <span className="font-semibold text-slate-900 font-mono text-xs leading-none">
+                {q.quotation_number}
               </span>
-              {q.incoterm && (
-                <span className="text-[10px] font-mono text-slate-400 mt-1 leading-none">
+              <span className="text-[10px] font-mono text-slate-500 font-medium bg-slate-100 px-1 py-0.5 rounded">
+                R{q.revision}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Customer",
+        headerClass: "ag-group-shipper",
+        children: [
+          {
+            field: "customer.name",
+            headerName: "Company Name",
+            minWidth: 180,
+            flex: 1.2,
+            cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
+              const q = params.data;
+              if (!q) return null;
+              return (
+                <div className="flex items-center gap-1.5 h-full text-xs font-medium text-slate-800">
+                  <Building2 size={13} className="text-slate-400 shrink-0" />
+                  <span className="truncate">{q.customer?.name || `Customer #${q.customer_id}`}</span>
+                </div>
+              );
+            },
+          },
+        ],
+      },
+      {
+        headerName: "Service Terms",
+        headerClass: "ag-group-service",
+        children: [
+          {
+            field: "transport_mode",
+            headerName: "Mode",
+            width: 120,
+            cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
+              const q = params.data;
+              if (!q) return null;
+              return (
+                <span className="capitalize text-slate-800 font-medium text-xs leading-none">
+                  {q.transport_mode.replace(/_/g, " ")}
+                </span>
+              );
+            },
+          },
+          {
+            field: "incoterm",
+            headerName: "Incoterm",
+            width: 105,
+            cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
+              const q = params.data;
+              if (!q?.incoterm) return <span className="text-slate-400 text-xs">—</span>;
+              return (
+                <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100/80 px-1.5 py-0.5 rounded">
                   {q.incoterm}
                 </span>
-              )}
-            </div>
-          );
-        },
+              );
+            },
+          },
+        ],
       },
       {
-        headerName: "Route",
-        minWidth: 220,
-        valueGetter: (params) => {
-          const q = params.data;
-          if (!q) return "";
-          return `${q.origin_location?.name || q.origin_location?.city || q.origin_location_id} to ${q.destination_location?.name || q.destination_location?.city || q.destination_location_id}`;
-        },
-        cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
-          const q = params.data;
-          if (!q) return null;
-          return (
-            <div className="flex items-center gap-1 h-full text-xs text-slate-700">
-              <span className="truncate font-medium">{q.origin_location?.city || q.origin_location?.name || `Loc #${q.origin_location_id}`}</span>
-              <ArrowRight size={11} className="text-slate-400 shrink-0" />
-              <span className="truncate font-medium">{q.destination_location?.city || q.destination_location?.name || `Loc #${q.destination_location_id}`}</span>
-            </div>
-          );
-        },
+        headerName: "Routing",
+        headerClass: "ag-group-origin",
+        children: [
+          {
+            headerName: "Origin",
+            width: 140,
+            valueGetter: (params) => params.data?.origin_location?.city || params.data?.origin_location?.name || "",
+            cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
+              const q = params.data;
+              if (!q) return null;
+              return (
+                <span className="text-xs text-slate-700 truncate font-medium">
+                  {q.origin_location?.city || q.origin_location?.name || `Loc #${q.origin_location_id}`}
+                </span>
+              );
+            },
+          },
+          {
+            headerName: "Destination",
+            width: 140,
+            valueGetter: (params) => params.data?.destination_location?.city || params.data?.destination_location?.name || "",
+            cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
+              const q = params.data;
+              if (!q) return null;
+              return (
+                <span className="text-xs text-slate-700 truncate font-medium">
+                  {q.destination_location?.city || q.destination_location?.name || `Loc #${q.destination_location_id}`}
+                </span>
+              );
+            },
+          },
+        ],
       },
       {
-        field: "total_amount",
-        headerName: "Total Quote Amount",
-        width: 160,
-        cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
-          const q = params.data;
-          if (!q) return null;
-          return (
-            <div className="flex items-center h-full font-mono font-bold text-xs text-slate-900">
-              {q.currency} {Number(q.total_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </div>
-          );
-        },
+        headerName: "Commercials",
+        headerClass: "ag-group-financial",
+        children: [
+          {
+            field: "total_amount",
+            headerName: "Total Amount",
+            width: 150,
+            cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
+              const q = params.data;
+              if (!q) return null;
+              return (
+                <div className="flex items-center h-full font-mono font-bold text-xs text-emerald-900">
+                  {q.currency} {Number(q.total_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </div>
+              );
+            },
+          },
+        ],
+      },
+      {
+        headerName: "Schedule",
+        headerClass: "ag-group-schedule",
+        children: [
+          {
+            field: "valid_until",
+            headerName: "Valid Until",
+            width: 125,
+            cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
+              const q = params.data;
+              if (!q?.valid_until) return <span className="text-slate-400 text-xs">—</span>;
+              return (
+                <span className="text-xs font-mono text-slate-600">
+                  {new Date(q.valid_until).toLocaleDateString("en-GB")}
+                </span>
+              );
+            },
+          },
+        ],
       },
       {
         field: "status",
         headerName: "Status",
-        width: 140,
+        width: 135,
         floatingFilter: false,
         cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
           const q = params.data;
@@ -197,7 +303,7 @@ export function QuotationList() {
       },
       {
         headerName: "Actions",
-        width: 160,
+        width: 145,
         pinned: "right",
         sortable: false,
         filter: false,
@@ -232,9 +338,22 @@ export function QuotationList() {
           );
         },
       },
-    ],
-    [can, updatingId, handleStatusUpdate]
-  );
+    ];
+
+    if (activeView === "commercial") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Quote ID", "Customer", "Service Terms", "Commercials", "Status", "Actions"].includes(name || "");
+      });
+    }
+    if (activeView === "routing") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Quote ID", "Routing", "Service Terms", "Schedule", "Status", "Actions"].includes(name || "");
+      });
+    }
+    return allCols;
+  }, [activeView, can, updatingId, handleStatusUpdate]);
 
   if (!organization) return <NoOrganization />;
   if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
@@ -267,13 +386,12 @@ export function QuotationList() {
         }
         subHeader={
           <>
-            <div className="flex items-center gap-2 flex-wrap">
-              <DateRangePill />
-              <FilterPill
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <FloatingFilterSelect
                 label="Status"
                 value={statusFilter}
+                allLabel="All Statuses"
                 options={[
-                  { value: "all", label: "All Statuses" },
                   { value: "draft", label: "Draft" },
                   { value: "sent", label: "Sent to Client" },
                   { value: "accepted", label: "Accepted" },
@@ -281,31 +399,58 @@ export function QuotationList() {
                   { value: "expired", label: "Expired" },
                 ]}
                 onChange={setStatusFilter}
+                minWidth="min-w-[115px]"
               />
-              <FilterPill
+              <FloatingFilterSelect
                 label="Mode"
                 value={modeFilter}
+                allLabel="All Modes"
                 options={[
-                  { value: "all", label: "All Modes" },
-                  { value: "road", label: "Road Freight" },
                   { value: "ocean_fcl", label: "Ocean FCL" },
                   { value: "ocean_lcl", label: "Ocean LCL" },
                   { value: "air", label: "Air Cargo" },
+                  { value: "road", label: "Road Freight" },
+                  { value: "multimodal", label: "Multimodal" },
                 ]}
                 onChange={setModeFilter}
+                minWidth="min-w-[115px]"
               />
-            </div>
-            <div className="flex items-center gap-2">
-              <SortPill
-                value={sort}
+              {customerOptions.length > 0 && (
+                <FloatingFilterSelect
+                  label="Client"
+                  value={customerFilter}
+                  allLabel="All Clients"
+                  options={customerOptions}
+                  onChange={setCustomerFilter}
+                  minWidth="min-w-[130px]"
+                />
+              )}
+              <FloatingDateFilter
+                label="Validity"
+                value={validityFilter}
                 options={[
-                  { value: "latest", label: "Latest created" },
-                  { value: "valid_until", label: "Expiry date" },
-                  { value: "amount", label: "Quote value" },
+                  { value: "all", label: "All Dates" },
+                  { value: "today", label: "Expiring Today" },
+                  { value: "this_week", label: "Expiring This Week" },
+                  { value: "this_month", label: "This Month" },
                 ]}
-                onChange={setSort}
+                onChange={setValidityFilter}
               />
-              <ViewSettingsButton />
+              {hasActiveFilters && (
+                <FilterResetButton onReset={resetAllFilters} />
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <ViewPresetSelector
+                activeView={activeView}
+                presets={[
+                  { id: "default", label: "Default View", desc: "All columns & commercial details" },
+                  { id: "commercial", label: "Commercial Focus", desc: "Customer, terms, pricing & actions" },
+                  { id: "routing", label: "Routing & Validity", desc: "Route origin/dest & schedule" },
+                ]}
+                onSelectView={setActiveView}
+              />
+              <ViewSettingsButton onClick={resetAllFilters} />
             </div>
           </>
         }
@@ -319,7 +464,7 @@ export function QuotationList() {
           <Empty
             title="No quotations found"
             description={
-              search || statusFilter !== "all"
+              search || hasActiveFilters
                 ? "No quotations match your current filters or search query."
                 : "Quotations generated for customer freight inquiries will appear here with full revision history."
             }

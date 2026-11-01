@@ -12,7 +12,9 @@ use App\Modules\Freight\FreightRequest;
 use App\Modules\Freight\Quotation;
 use App\Modules\Freight\Shipment;
 use App\Modules\Locations\Location;
+use App\Modules\MaterialRequests\MaterialRequest;
 use App\Modules\Partners\BusinessPartner;
+use App\Modules\PurchaseOrders\PurchaseOrder;
 use App\Modules\Team\Department;
 use App\Modules\Team\Invitation;
 use App\Modules\Transportation\DispatchTrip;
@@ -54,6 +56,16 @@ class Organization extends Model
     public function partners(): HasMany
     {
         return $this->hasMany(BusinessPartner::class);
+    }
+
+    public function materialRequests(): HasMany
+    {
+        return $this->hasMany(MaterialRequest::class);
+    }
+
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class);
     }
 
     public function locations(): HasMany

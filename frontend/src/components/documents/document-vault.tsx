@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { type ColDef } from "ag-grid-community";
+import { type ColDef, type ColGroupDef } from "ag-grid-community";
 import { type CustomCellRendererProps } from "ag-grid-react";
 import {
   FileText,
@@ -32,9 +32,10 @@ import { MekongDataGrid } from "@/components/ui/data-grid";
 import { UploadDocumentDialog } from "./upload-document-dialog";
 import {
   WorkspaceHeaderSlot,
-  FilterPill,
-  DateRangePill,
-  SortPill,
+  FloatingFilterSelect,
+  FloatingDateFilter,
+  ViewPresetSelector,
+  FilterResetButton,
   ViewSettingsButton,
 } from "@/components/navigation/header-context";
 
@@ -43,7 +44,8 @@ export function DocumentVault() {
   const [search, setSearch] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sort, setSort] = useState<string>("latest");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [activeView, setActiveView] = useState<string>("default");
 
   const catalogRes = useResource<{ data: DocumentCatalog }>(
     organization ? `${documentsRoot(organization.id)}/catalog` : null
@@ -81,7 +83,41 @@ export function DocumentVault() {
     total_reconciliations: 0,
     unresolved_reconciliations: 0,
   };
-  const documents = documentsRes.data?.data || [];
+  const rawDocuments = useMemo(
+    () => documentsRes.data?.data || [],
+    [documentsRes.data?.data]
+  );
+
+  const hasActiveFilters =
+    typeFilter !== "all" ||
+    statusFilter !== "all" ||
+    dateFilter !== "all" ||
+    search.trim() !== "";
+
+  const resetAllFilters = () => {
+    setTypeFilter("all");
+    setStatusFilter("all");
+    setDateFilter("all");
+    setSearch("");
+  };
+
+  const documents = useMemo(() => {
+    return rawDocuments.filter((doc) => {
+      if (dateFilter !== "all" && doc.created_at) {
+        const d = new Date(doc.created_at);
+        const now = new Date();
+        if (dateFilter === "today") {
+          if (d.toDateString() !== now.toDateString()) return false;
+        } else if (dateFilter === "this_week") {
+          const diff = (d.getTime() - now.getTime()) / (1000 * 3600 * 24);
+          if (diff < -1 || diff > 7) return false;
+        } else if (dateFilter === "this_month") {
+          if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return false;
+        }
+      }
+      return true;
+    });
+  }, [rawDocuments, dateFilter]);
 
   const handleDelete = useCallback(
     async (docId: number) => {
@@ -141,147 +177,178 @@ export function DocumentVault() {
     return <span className="text-xs font-medium text-slate-700">{documentTypeLabel(type)}</span>;
   };
 
-  const columnDefs = useMemo<ColDef<TradeDocument>[]>(
-    () => [
+  // AG Grid Column Definitions with Vektor TMS Tinted Group Headers (100% Single-Line)
+  const columnDefs = useMemo<(ColDef<TradeDocument> | ColGroupDef<TradeDocument>)[]>(() => {
+    const allCols: (ColDef<TradeDocument> | ColGroupDef<TradeDocument>)[] = [
       {
-        headerName: "DOCUMENT / FILE",
+        headerName: "Document File",
         field: "document_number",
-        minWidth: 260,
-        flex: 1.5,
+        width: 175,
+        pinned: "left",
         cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
           const doc = params.data;
           if (!doc) return null;
           return (
-            <div className="flex flex-col justify-center h-full py-1 leading-tight">
-              <div className="font-semibold text-slate-900 flex items-center gap-1.5">
-                <FileText className="size-3.5 text-blue-900 shrink-0" />
-                <span className="truncate">{doc.document_number || "Document #" + doc.id}</span>
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono truncate mt-0.5">
-                {doc.file_name}
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        headerName: "TYPE",
-        field: "document_type",
-        width: 170,
-        cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
-          const doc = params.data;
-          if (!doc) return null;
-          return <div className="flex items-center h-full">{getTypeLabel(doc.document_type)}</div>;
-        },
-      },
-      {
-        headerName: "LINKED SHIPMENT",
-        minWidth: 190,
-        flex: 1,
-        valueGetter: (params) => params.data?.shipment?.shipment_number || "",
-        cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
-          const doc = params.data;
-          if (!doc) return null;
-          if (doc.shipment) {
-            return (
-              <div className="flex items-center h-full">
-                <Link
-                  href={`/freight/shipments/${doc.shipment.id}`}
-                  className="font-medium text-blue-900 hover:text-blue-800 text-xs flex items-center gap-1"
-                >
-                  <span>{doc.shipment.shipment_number}</span>
-                  <ArrowRight className="size-3" />
-                </Link>
-              </div>
-            );
-          }
-          return <span className="text-xs text-slate-400 italic flex items-center h-full">Unlinked</span>;
-        },
-      },
-      {
-        headerName: "ITEMS",
-        width: 110,
-        valueGetter: (params) => params.data?.items_count ?? params.data?.items?.length ?? 0,
-        cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
-          const doc = params.data;
-          if (!doc) return null;
-          const count = doc.items_count ?? doc.items?.length ?? 0;
-          return (
-            <div className="flex items-center h-full">
-              <span className="text-xs font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60 font-mono">
-                {count} lines
+            <div className="flex items-center gap-1.5 h-full">
+              <FileText className="size-3.5 text-blue-900 shrink-0" />
+              <span className="font-semibold text-slate-900 text-xs truncate">
+                {doc.document_number || "Doc #" + doc.id}
               </span>
             </div>
           );
         },
       },
       {
-        headerName: "AI CONFIDENCE",
-        field: "confidence_score",
-        width: 170,
-        cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
-          const doc = params.data;
-          if (!doc) return null;
-          const pct = Math.min(100, Number(doc.confidence_score) || 95);
-          return (
-            <div className="flex items-center gap-2 h-full">
-              <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60 shrink-0">
-                <div
-                  className="h-full bg-emerald-500 rounded-full"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <span className="text-[11px] font-semibold text-slate-700 font-mono">
-                {pct.toFixed(0)}%
-              </span>
-            </div>
-          );
-        },
+        headerName: "Classification",
+        headerClass: "ag-group-shipper",
+        children: [
+          {
+            headerName: "Type",
+            field: "document_type",
+            width: 155,
+            cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
+              const doc = params.data;
+              if (!doc) return null;
+              return <div className="flex items-center h-full">{getTypeLabel(doc.document_type)}</div>;
+            },
+          },
+          {
+            headerName: "Linked Shipment",
+            minWidth: 160,
+            flex: 1.1,
+            valueGetter: (params) => params.data?.shipment?.shipment_number || "",
+            cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
+              const doc = params.data;
+              if (!doc) return null;
+              if (doc.shipment) {
+                return (
+                  <div className="flex items-center h-full">
+                    <Link
+                      href={`/freight/shipments/${doc.shipment.id}`}
+                      className="font-medium text-blue-900 hover:text-blue-800 text-xs flex items-center gap-1"
+                    >
+                      <span>{doc.shipment.shipment_number}</span>
+                      <ArrowRight className="size-3" />
+                    </Link>
+                  </div>
+                );
+              }
+              return <span className="text-xs text-slate-400 italic flex items-center h-full">Unlinked</span>;
+            },
+          },
+        ],
       },
       {
-        headerName: "STATUS",
-        field: "status",
-        width: 150,
-        cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
-          const doc = params.data;
-          if (!doc) return null;
-          return <div className="flex items-center h-full">{getStatusBadge(doc.status)}</div>;
-        },
+        headerName: "AI Parsing & Quality",
+        headerClass: "ag-group-service",
+        children: [
+          {
+            headerName: "Lines",
+            width: 95,
+            valueGetter: (params) => params.data?.items_count ?? params.data?.items?.length ?? 0,
+            cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
+              const doc = params.data;
+              if (!doc) return null;
+              const count = doc.items_count ?? doc.items?.length ?? 0;
+              return (
+                <span className="text-xs font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded font-mono">
+                  {count} lines
+                </span>
+              );
+            },
+          },
+          {
+            headerName: "AI Confidence",
+            field: "confidence_score",
+            width: 145,
+            cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
+              const doc = params.data;
+              if (!doc) return null;
+              const pct = Math.min(100, Number(doc.confidence_score) || 95);
+              return (
+                <div className="flex items-center gap-2 h-full">
+                  <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60 shrink-0">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-700 font-mono">
+                    {pct.toFixed(0)}%
+                  </span>
+                </div>
+              );
+            },
+          },
+        ],
       },
       {
-        headerName: "ACTIONS",
-        width: 130,
+        headerName: "Reconciliation",
+        headerClass: "ag-group-schedule",
+        children: [
+          {
+            headerName: "Status",
+            field: "status",
+            width: 140,
+            cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
+              const doc = params.data;
+              if (!doc) return null;
+              return <div className="flex items-center h-full">{getStatusBadge(doc.status)}</div>;
+            },
+          },
+        ],
+      },
+      {
+        headerName: "Actions",
+        width: 140,
         pinned: "right",
         sortable: false,
         filter: false,
-        suppressHeaderMenuButton: true,
         cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
           const doc = params.data;
           if (!doc) return null;
           return (
             <div className="flex items-center justify-end gap-1.5 h-full">
               <Link href={`/documents/${doc.id}`}>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-blue-900 hover:text-blue-800 hover:bg-blue-50">
-                  Inspect
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[11px] text-blue-900 hover:text-blue-800 hover:bg-blue-50 px-2"
+                >
+                  View
                 </Button>
               </Link>
-              {can("documents.delete") && (
+              {can("documents.upload") && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDelete(doc.id)}
-                  className="size-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                  className="h-6 w-6 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                  title="Delete Document"
                 >
-                  <Trash2 className="size-3.5" />
+                  <Trash2 className="size-3" />
                 </Button>
               )}
             </div>
           );
         },
       },
-    ],
-    [can, handleDelete]
-  );
+    ];
+
+    if (activeView === "reconciliation") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Document File", "AI Parsing & Quality", "Reconciliation", "Actions"].includes(name || "");
+      });
+    }
+    if (activeView === "classification") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Document File", "Classification", "Reconciliation", "Actions"].includes(name || "");
+      });
+    }
+    return allCols;
+  }, [activeView, can, handleDelete]);
 
   if (!organization) return <NoOrganization />;
   if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
@@ -289,34 +356,29 @@ export function DocumentVault() {
   if (!catalogRes.data) return <Loading />;
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex-1 min-h-0 w-full h-full flex flex-col overflow-hidden">
       {/* Vektor TMS Flexible Header & Sub-Header Toolbar */}
       <WorkspaceHeaderSlot
         fullWidth={true}
-        title="Trade Documents"
+        title="Document Vault"
         icon={FileText}
         tabs={[
-          { id: "all", label: "All Vault", count: stats.total_documents },
-          { id: "commercial_invoice", label: "Invoices" },
-          { id: "packing_list", label: "Packing Lists" },
-          { id: "bill_of_lading", label: "Bills of Lading" },
-          { id: "cdc_master_list", label: "CDC Master Lists" },
+          { id: "all", label: "All Documents", count: stats.total_documents },
+          { id: "reconciled", label: "Reconciled", count: stats.reconciled },
+          { id: "flagged", label: "Discrepancies", count: stats.flagged || undefined },
+          { id: "verified", label: "Verified", count: stats.verified },
         ]}
-        activeTab={typeFilter}
-        onTabChange={setTypeFilter}
+        activeTab={statusFilter}
+        onTabChange={setStatusFilter}
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search document #, trader, reference..."
+        searchPlaceholder="Search document number, file name, shipment..."
         primaryAction={
           <div className="flex items-center gap-2">
             <Link href="/documents/reconciliation">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 text-xs border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100"
-              >
-                <Scale size={13} />
-                <span className="hidden sm:inline">Reconciliation</span>
+              <Button variant="outline" className="gap-1.5 h-9 text-xs">
+                <Scale size={14} className="text-blue-900" />
+                <span>Reconciliation Engine</span>
               </Button>
             </Link>
             {can("documents.upload") && (
@@ -332,31 +394,48 @@ export function DocumentVault() {
         }
         subHeader={
           <>
-            <div className="flex items-center gap-2 flex-wrap">
-              <DateRangePill />
-              <FilterPill
-                label="Document Status"
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <FloatingFilterSelect
+                label="Status"
                 value={statusFilter}
+                allLabel="All Statuses"
                 options={[
-                  { value: "all", label: "All Statuses" },
                   { value: "parsed", label: "AI Parsed" },
                   { value: "reconciled", label: "Reconciled" },
                   { value: "flagged", label: "Flagged Discrepancies" },
                   { value: "verified", label: "Verified" },
                 ]}
                 onChange={setStatusFilter}
+                minWidth="min-w-[125px]"
               />
+              <FloatingFilterSelect
+                label="Doc Type"
+                value={typeFilter}
+                allLabel="All Types"
+                options={catalog.document_types || []}
+                onChange={setTypeFilter}
+                minWidth="min-w-[130px]"
+              />
+              <FloatingDateFilter
+                label="Uploaded"
+                value={dateFilter}
+                onChange={setDateFilter}
+              />
+              {hasActiveFilters && (
+                <FilterResetButton onReset={resetAllFilters} />
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <SortPill
-                value={sort}
-                options={[
-                  { value: "latest", label: "Latest uploaded" },
-                  { value: "number", label: "Document number" },
+            <div className="flex items-center gap-2 shrink-0">
+              <ViewPresetSelector
+                activeView={activeView}
+                presets={[
+                  { id: "default", label: "Default View", desc: "All files, shipments & AI parsing" },
+                  { id: "reconciliation", label: "Reconciliation & Audit", desc: "Status & AI confidence" },
+                  { id: "classification", label: "Classification", desc: "Document types & shipments" },
                 ]}
-                onChange={setSort}
+                onSelectView={setActiveView}
               />
-              <ViewSettingsButton />
+              <ViewSettingsButton onClick={resetAllFilters} />
             </div>
           </>
         }
@@ -369,32 +448,37 @@ export function DocumentVault() {
           <div className="text-xl font-bold text-slate-900 mt-0.5">{stats.total_documents}</div>
           <div className="text-[10px] text-slate-400">Across active shipments</div>
         </div>
+
         <div className="rounded-lg border border-slate-200/90 bg-white p-2.5 shadow-2xs">
-          <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wider">Verified Documents</div>
-          <div className="text-xl font-bold text-purple-900 mt-0.5">{stats.verified}</div>
-          <div className="text-[10px] text-purple-600">Audited & confirmed</div>
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Reconciled</div>
+          <div className="text-xl font-bold text-emerald-700 mt-0.5">{stats.reconciled}</div>
+          <div className="text-[10px] text-slate-400">Zero variance across documents</div>
         </div>
+
         <div className="rounded-lg border border-slate-200/90 bg-white p-2.5 shadow-2xs">
-          <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider">Reconciled Cleanly</div>
-          <div className="text-xl font-bold text-emerald-900 mt-0.5">{stats.reconciled}</div>
-          <div className="text-[10px] text-emerald-600">Invoice vs Packing matched</div>
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Flagged Discrepancies</div>
+          <div className="text-xl font-bold text-amber-700 mt-0.5">{stats.flagged}</div>
+          <div className="text-[10px] text-slate-400">Requires manual reconciliation</div>
         </div>
+
         <div className="rounded-lg border border-slate-200/90 bg-white p-2.5 shadow-2xs">
-          <div className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider">Discrepancy Flags</div>
-          <div className="text-xl font-bold text-amber-900 mt-0.5">{stats.flagged}</div>
-          <div className="text-[10px] text-amber-600">Weight / qty diffs found</div>
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Verified & Stamped</div>
+          <div className="text-xl font-bold text-purple-700 mt-0.5">{stats.verified}</div>
+          <div className="text-[10px] text-slate-400">Audited for customs lodging</div>
         </div>
       </div>
 
-      {/* Documents AG Grid */}
-      {documents.length === 0 ? (
-        <div className="p-8">
+      {/* Main Content: Full-Bleed AG Grid Table */}
+      {!documentsRes.data && !documentsRes.error ? (
+        <Loading />
+      ) : documents.length === 0 ? (
+        <div className="p-6">
           <Empty
-            title="No Trade Documents Found"
+            title="No documents in vault"
             description={
-              search || typeFilter !== "all" || statusFilter !== "all"
-                ? "No documents match your active search filters."
-                : "Upload commercial invoices, packing lists, or B/Ls to start automated extraction and cross-reconciliation."
+              search || hasActiveFilters
+                ? "No trade documents match your active search or filter selection."
+                : "Upload commercial invoices, packing lists, and bills of lading to extract line items with OCR."
             }
             action={
               can("documents.upload") ? (
@@ -405,18 +489,19 @@ export function DocumentVault() {
                     catalogRes.reload();
                   }}
                 />
-              ) : undefined
+              ) : null
             }
           />
         </div>
       ) : (
-        <MekongDataGrid<TradeDocument>
-          rowData={documents}
-          columnDefs={columnDefs}
-          title="Trade Document Vault"
-          quickFilterPlaceholder="Quick search document #, trader..."
-          className="flex-1 min-h-0"
-        />
+        <div className="flex-1 min-h-0 w-full h-full flex flex-col">
+          <MekongDataGrid<TradeDocument>
+            rowData={documents}
+            columnDefs={columnDefs}
+            fullScreen={true}
+            quickFilterPlaceholder="Quick search in documents..."
+          />
+        </div>
       )}
     </div>
   );

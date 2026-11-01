@@ -37,7 +37,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 
 // Mekong Enterprise Theme based on themeQuartz (Vektor-grade edge-to-edge styling)
 export const mekongGridTheme = themeQuartz.withParams({
-  accentColor: "#0f3e78",
+  accentColor: "#2563eb",
   backgroundColor: "#ffffff",
   foregroundColor: "#0f172a",
   headerBackgroundColor: "#f8fafc",

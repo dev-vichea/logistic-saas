@@ -12,7 +12,7 @@ enum Role: string
 
     public function permissions(): array
     {
-        $read = ['organization.view', 'dashboard.view', 'team.view', 'departments.view', 'partners.view', 'freight.view', 'transport.view', 'documents.view', 'customs.view'];
+        $read = ['organization.view', 'dashboard.view', 'team.view', 'departments.view', 'partners.view', 'freight.view', 'transport.view', 'documents.view', 'customs.view', 'material_requests.view', 'material_requests.manage', 'purchase_orders.view', 'purchase_orders.manage'];
 
         $customsOps = ['customs.manage', 'customs.declare', 'customs.deduct_cdc'];
 

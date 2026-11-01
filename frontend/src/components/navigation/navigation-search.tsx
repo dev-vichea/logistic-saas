@@ -11,6 +11,8 @@ import {
 import {
   navigationGroups,
   overview,
+  materialRequestsNav,
+  purchaseOrdersNav,
   type NavigationItem,
 } from "@/lib/navigation";
 
@@ -32,6 +34,12 @@ export function NavigationSearch({
   const list = useRef<HTMLDivElement>(null);
   const entries: SearchEntry[] = [
     { ...overview, group: "Workspace" },
+    ...(!materialRequestsNav.permission || can(materialRequestsNav.permission)
+      ? [{ ...materialRequestsNav, group: "Workspace" }]
+      : []),
+    ...(!purchaseOrdersNav.permission || can(purchaseOrdersNav.permission)
+      ? [{ ...purchaseOrdersNav, group: "Workspace" }]
+      : []),
     ...navigationGroups.flatMap((group) =>
       group.items
         .filter((item) => !item.permission || can(item.permission))

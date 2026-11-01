@@ -7,11 +7,10 @@ import {
   Plus,
   ArrowRight,
   TrendingDown,
-  Layers,
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, ColGroupDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { useWorkspace } from "@/components/workspace";
 import { NoOrganization, Loading, ErrorBox, Empty } from "@/components/common";
@@ -29,9 +28,10 @@ import { MekongDataGrid } from "@/components/ui/data-grid";
 import { NewDeclarationDialog } from "./new-declaration-dialog";
 import {
   WorkspaceHeaderSlot,
-  FilterPill,
-  DateRangePill,
-  SortPill,
+  FloatingFilterSelect,
+  FloatingDateFilter,
+  ViewPresetSelector,
+  FilterResetButton,
   ViewSettingsButton,
 } from "@/components/navigation/header-context";
 
@@ -41,7 +41,8 @@ export function CustomsDashboard() {
   const [laneFilter, setLaneFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [officeFilter, setOfficeFilter] = useState<string>("all");
-  const [sort, setSort] = useState<string>("latest");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [activeView, setActiveView] = useState<string>("default");
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const catalogRes = useResource<{ data: CustomsCatalog }>(
@@ -58,124 +59,182 @@ export function CustomsDashboard() {
     organization ? `${customsRoot(organization.id)}/declarations?${queryParams.toString()}` : null
   );
 
-  // AG Grid Column Definitions
-  const columnDefs = useMemo<ColDef<CustomsDeclaration>[]>(
-    () => [
+  const rawDeclarations = useMemo(
+    () => declarationsRes.data?.data || [],
+    [declarationsRes.data?.data]
+  );
+
+  const hasActiveFilters =
+    laneFilter !== "all" ||
+    statusFilter !== "all" ||
+    officeFilter !== "all" ||
+    dateFilter !== "all" ||
+    search.trim() !== "";
+
+  const resetAllFilters = () => {
+    setLaneFilter("all");
+    setStatusFilter("all");
+    setOfficeFilter("all");
+    setDateFilter("all");
+    setSearch("");
+  };
+
+  const declarations = useMemo(() => {
+    return rawDeclarations.filter((d) => {
+      if (dateFilter !== "all" && d.declaration_date) {
+        const date = new Date(d.declaration_date);
+        const now = new Date();
+        if (dateFilter === "today") {
+          if (date.toDateString() !== now.toDateString()) return false;
+        } else if (dateFilter === "this_week") {
+          const diff = (date.getTime() - now.getTime()) / (1000 * 3600 * 24);
+          if (diff < -1 || diff > 7) return false;
+        } else if (dateFilter === "this_month") {
+          if (date.getMonth() !== now.getMonth() || date.getFullYear() !== now.getFullYear()) return false;
+        }
+      }
+      return true;
+    });
+  }, [rawDeclarations, dateFilter]);
+
+  // AG Grid Column Definitions with Vektor TMS Tinted Group Headers (100% Single-Line)
+  const columnDefs = useMemo<(ColDef<CustomsDeclaration> | ColGroupDef<CustomsDeclaration>)[]>(() => {
+    const allCols: (ColDef<CustomsDeclaration> | ColGroupDef<CustomsDeclaration>)[] = [
       {
         field: "declaration_number",
         headerName: "Declaration (SAD)",
-        minWidth: 190,
+        width: 165,
         pinned: "left",
         cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
           const d = params.data;
           if (!d) return null;
           return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight">
+            <div className="flex items-center gap-1.5 h-full">
               <Link
                 href={`/customs/${d.id}`}
                 className="font-mono font-bold text-blue-900 hover:underline text-xs leading-none"
               >
                 {d.declaration_number}
               </Link>
-              <div className="text-[10px] text-slate-400 mt-1 leading-none">
-                {d.declaration_date} &bull; <span className="uppercase font-medium">{d.declaration_type}</span>
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        headerName: "Office & Regime",
-        width: 150,
-        cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
-          const d = params.data;
-          if (!d) return null;
-          return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight text-xs">
-              <span className="font-semibold text-slate-800 leading-none">{d.customs_office_code}</span>
-              <span className="text-[10px] text-slate-400 mt-1 leading-none">{d.regime_code}</span>
-            </div>
-          );
-        },
-      },
-      {
-        field: "inspection_lane",
-        headerName: "Inspection Lane",
-        width: 150,
-        cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
-          const d = params.data;
-          if (!d) return null;
-          const laneCfg = laneColor(d.inspection_lane);
-          return (
-            <div className="flex items-center h-full">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700">
-                <span className={`size-2 rounded-full ${laneCfg?.border?.replace('border-', 'bg-') || 'bg-slate-400'}`} />
-                {laneCfg?.label || 'Unassigned'}
+              <span className="text-[10px] font-mono text-slate-500 uppercase bg-slate-100 px-1 py-0.5 rounded">
+                {d.declaration_type}
               </span>
             </div>
           );
         },
       },
       {
-        headerName: "Linked Reference",
-        minWidth: 170,
-        cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
-          const d = params.data;
-          if (!d) return null;
-          return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight text-xs">
-              {d.shipment ? (
-                <span className="font-mono text-slate-800 font-medium leading-none">{d.shipment.shipment_number}</span>
-              ) : (
-                <span className="text-slate-400 italic leading-none">Direct Entry</span>
-              )}
-              <div className="text-[10px] text-slate-400 mt-1 leading-none truncate">
-                {d.invoice_number && `Inv: ${d.invoice_number}`}
-                {d.bill_of_lading_number && ` | BL: ${d.bill_of_lading_number}`}
-              </div>
-            </div>
-          );
-        },
+        headerName: "Regime & Office",
+        headerClass: "ag-group-shipper",
+        children: [
+          {
+            field: "customs_office_code",
+            headerName: "Office Code",
+            width: 120,
+            cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
+              const d = params.data;
+              if (!d) return null;
+              return <span className="font-semibold text-slate-800 text-xs">{d.customs_office_code}</span>;
+            },
+          },
+          {
+            field: "regime_code",
+            headerName: "Regime",
+            width: 100,
+            cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
+              const d = params.data;
+              if (!d) return null;
+              return <span className="font-mono text-xs text-slate-600">{d.regime_code}</span>;
+            },
+          },
+        ],
       },
       {
-        field: "customs_value_usd",
-        headerName: "Customs Valuation",
-        width: 160,
-        cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
-          const d = params.data;
-          if (!d) return null;
-          return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight text-xs">
-              <span className="font-mono font-semibold text-slate-900 leading-none">
-                ${parseFloat(String(d.customs_value_usd || 0)).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </span>
-              <span className="text-[10px] text-slate-400 mt-1 leading-none">
-                {d.total_packages} pkgs &bull; {parseFloat(String(d.total_gross_weight_kg || 0)).toLocaleString()} kg
-              </span>
-            </div>
-          );
-        },
+        headerName: "Inspection",
+        headerClass: "ag-group-service",
+        children: [
+          {
+            field: "inspection_lane",
+            headerName: "Channel Lane",
+            width: 135,
+            cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
+              const d = params.data;
+              if (!d) return null;
+              const laneCfg = laneColor(d.inspection_lane);
+              return (
+                <div className="flex items-center h-full">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                    <span className={`size-2 rounded-full ${laneCfg?.border?.replace('border-', 'bg-') || 'bg-slate-400'}`} />
+                    {laneCfg?.label || 'Unassigned'}
+                  </span>
+                </div>
+              );
+            },
+          },
+        ],
       },
       {
-        field: "duty_exemption_amount_usd",
-        headerName: "Duty Exemption (CDC)",
-        width: 160,
-        cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
-          const d = params.data;
-          if (!d) return null;
-          return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight text-xs">
-              <span className="font-mono font-semibold text-emerald-700 leading-none">
-                ${parseFloat(String(d.duty_exemption_amount_usd || 0)).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </span>
-              {d.cdc_master_list && (
-                <span className="text-[10px] text-indigo-600 truncate mt-1 leading-none block">
-                  QIP #{d.cdc_master_list.qip_number}
+        headerName: "Commercial Refs",
+        headerClass: "ag-group-origin",
+        children: [
+          {
+            headerName: "Linked Shipment",
+            width: 140,
+            cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
+              const d = params.data;
+              if (!d) return null;
+              if (!d.shipment) return <span className="text-slate-400 text-xs italic">Direct Entry</span>;
+              return <span className="font-mono text-slate-800 font-medium text-xs">{d.shipment.shipment_number}</span>;
+            },
+          },
+          {
+            headerName: "Invoice / B/L",
+            width: 140,
+            cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
+              const d = params.data;
+              if (!d) return null;
+              return (
+                <span className="text-xs text-slate-600 font-mono truncate">
+                  {d.invoice_number ? `Inv: ${d.invoice_number}` : d.bill_of_lading_number ? `BL: ${d.bill_of_lading_number}` : "—"}
                 </span>
-              )}
-            </div>
-          );
-        },
+              );
+            },
+          },
+        ],
+      },
+      {
+        headerName: "Valuation & CDC",
+        headerClass: "ag-group-financial",
+        children: [
+          {
+            field: "customs_value_usd",
+            headerName: "Customs Valuation",
+            width: 145,
+            cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
+              const d = params.data;
+              if (!d) return null;
+              return (
+                <span className="font-mono font-bold text-slate-900 text-xs">
+                  ${parseFloat(String(d.customs_value_usd || 0)).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
+              );
+            },
+          },
+          {
+            field: "duty_exemption_amount_usd",
+            headerName: "CDC Exemption",
+            width: 140,
+            cellRenderer: (params: CustomCellRendererProps<CustomsDeclaration>) => {
+              const d = params.data;
+              if (!d) return null;
+              return (
+                <span className="font-mono font-semibold text-emerald-700 text-xs">
+                  ${parseFloat(String(d.duty_exemption_amount_usd || 0)).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
+              );
+            },
+          },
+        ],
       },
       {
         field: "status",
@@ -197,7 +256,7 @@ export function CustomsDashboard() {
       },
       {
         headerName: "Action",
-        width: 100,
+        width: 95,
         pinned: "right",
         sortable: false,
         filter: false,
@@ -216,9 +275,22 @@ export function CustomsDashboard() {
           );
         },
       },
-    ],
-    []
-  );
+    ];
+
+    if (activeView === "inspection") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Declaration (SAD)", "Regime & Office", "Inspection", "Clearance Status", "Action"].includes(name || "");
+      });
+    }
+    if (activeView === "cdc") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Declaration (SAD)", "Commercial Refs", "Valuation & CDC", "Clearance Status", "Action"].includes(name || "");
+      });
+    }
+    return allCols;
+  }, [activeView]);
 
   if (!organization) return <NoOrganization />;
   if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
@@ -237,8 +309,6 @@ export function CustomsDashboard() {
     total_cdc_lists: 0,
     total_cdc_exemption_usd: 0,
   };
-
-  const declarations = declarationsRes.data?.data || [];
 
   return (
     <div className="flex-1 min-h-0 w-full h-full flex flex-col overflow-hidden">
@@ -272,44 +342,62 @@ export function CustomsDashboard() {
         }
         subHeader={
           <>
-            <div className="flex items-center gap-2 flex-wrap">
-              <DateRangePill />
-              <FilterPill
-                label="Clearance Status"
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <FloatingFilterSelect
+                label="Status"
                 value={statusFilter}
-                options={[
-                  { value: "all", label: "All Clearance Statuses" },
-                  ...(catalog.declaration_statuses?.map((st) => ({
-                    value: st.value,
-                    label: st.label,
-                  })) || []),
-                ]}
+                allLabel="All Statuses"
+                options={catalog.declaration_statuses?.map((st) => ({
+                  value: st.value,
+                  label: st.label,
+                })) || []}
                 onChange={setStatusFilter}
+                minWidth="min-w-[120px]"
               />
-              <FilterPill
-                label="Customs Office"
+              <FloatingFilterSelect
+                label="Office"
                 value={officeFilter}
-                options={[
-                  { value: "all", label: "All Customs Offices" },
-                  ...(catalog.customs_offices?.map((off) => ({
-                    value: off.code,
-                    label: `${off.code} - ${off.name}`,
-                  })) || []),
-                ]}
+                allLabel="All Offices"
+                options={catalog.customs_offices?.map((off) => ({
+                  value: off.code,
+                  label: `${off.code} - ${off.name}`,
+                })) || []}
                 onChange={setOfficeFilter}
+                minWidth="min-w-[130px]"
               />
-            </div>
-            <div className="flex items-center gap-2">
-              <SortPill
-                value={sort}
+              <FloatingFilterSelect
+                label="Lane"
+                value={laneFilter}
+                allLabel="All Lanes"
                 options={[
-                  { value: "latest", label: "Latest declaration" },
-                  { value: "value", label: "Customs valuation" },
-                  { value: "duty", label: "Duty exemption" },
+                  { value: "green", label: "Green Channel" },
+                  { value: "blue", label: "Blue Channel" },
+                  { value: "yellow", label: "Yellow Channel" },
+                  { value: "red", label: "Red Channel" },
                 ]}
-                onChange={setSort}
+                onChange={setLaneFilter}
+                minWidth="min-w-[120px]"
               />
-              <ViewSettingsButton />
+              <FloatingDateFilter
+                label="Lodge Date"
+                value={dateFilter}
+                onChange={setDateFilter}
+              />
+              {hasActiveFilters && (
+                <FilterResetButton onReset={resetAllFilters} />
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <ViewPresetSelector
+                activeView={activeView}
+                presets={[
+                  { id: "default", label: "Default View", desc: "All columns & valuation" },
+                  { id: "inspection", label: "Inspection & Risk", desc: "Lane, office & status" },
+                  { id: "cdc", label: "Valuation & CDC", desc: "Customs value & CDC exemptions" },
+                ]}
+                onSelectView={setActiveView}
+              />
+              <ViewSettingsButton onClick={resetAllFilters} />
             </div>
           </>
         }
@@ -358,45 +446,44 @@ export function CustomsDashboard() {
         <div className="rounded-lg border border-slate-200/90 bg-white p-2.5 shadow-2xs col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-[10px] font-semibold uppercase tracking-wider">CDC Master Lists</span>
-            <Layers size={13} className="text-indigo-600" />
+            <CheckCircle2 size={13} className="text-blue-900" />
           </div>
-          <div className="text-lg font-bold text-indigo-700 mt-0.5">{stats.total_cdc_lists}</div>
-          <div className="text-[10px] text-slate-400">
-            <Link href="/customs/cdc" className="text-blue-900 hover:underline">
-              View QIP quotas &rarr;
-            </Link>
-          </div>
+          <div className="text-lg font-bold text-slate-900 mt-0.5">{stats.total_cdc_lists}</div>
+          <div className="text-[10px] text-slate-400">Active tax exemptions</div>
         </div>
       </div>
 
-      {/* Declarations List: AG Grid or Classic Table */}
-      {declarations.length === 0 ? (
+      {/* Main Content: Full-Bleed AG Grid Table */}
+      {!declarationsRes.data && !declarationsRes.error ? (
+        <Loading />
+      ) : declarations.length === 0 ? (
         <div className="p-6">
           <Empty
-            title="No customs declarations found"
+            title="No declarations lodged"
             description={
-              search || laneFilter !== "all" || statusFilter !== "all" || officeFilter !== "all"
-                ? "No declarations match your active search filters."
-                : "Lodge your first ASYCUDA Single Administrative Document (SAD) declaration or link one from your active shipments."
+              search || hasActiveFilters
+                ? "No customs declarations match your active query or filters."
+                : "Submit your first single administrative document (SAD) to track ASYCUDA World clearance channels."
             }
             action={
               can("customs.declare") ? (
-                <Button onClick={() => setDialogOpen(true)} className="gap-2 bg-blue-900 text-white">
-                  <Plus className="w-4 h-4" />
-                  Lodge ASYCUDA SAD
+                <Button
+                  onClick={() => setDialogOpen(true)}
+                  className="gap-1.5 shadow-2xs text-xs"
+                >
+                  <Plus size={14} />
+                  Lodge SAD Declaration
                 </Button>
-              ) : undefined
+              ) : null
             }
           />
         </div>
       ) : (
-        /* AG Grid Enterprise View (Edge-to-Edge) */
-        <div className="flex-1 min-h-0 w-full flex flex-col">
+        <div className="flex-1 min-h-0 w-full h-full flex flex-col">
           <MekongDataGrid<CustomsDeclaration>
             rowData={declarations}
             columnDefs={columnDefs}
             fullScreen={true}
-            title="ASYCUDA SAD Declarations"
             quickFilterPlaceholder="Quick search in declarations..."
           />
         </div>
@@ -407,7 +494,10 @@ export function CustomsDashboard() {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           catalog={catalog}
-          onCreated={() => declarationsRes.reload()}
+          onCreated={() => {
+            declarationsRes.reload();
+            catalogRes.reload();
+          }}
         />
       )}
     </div>

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { type ColDef } from "ag-grid-community";
+import { type ColDef, type ColGroupDef } from "ag-grid-community";
 import { type CustomCellRendererProps } from "ag-grid-react";
 import {
   Plus,
@@ -27,8 +27,9 @@ import { MekongDataGrid } from "@/components/ui/data-grid";
 import { PartnerStatus } from "./fields";
 import {
   WorkspaceHeaderSlot,
-  FilterPill,
-  SortPill,
+  FloatingFilterSelect,
+  ViewPresetSelector,
+  FilterResetButton,
   ViewSettingsButton,
 } from "@/components/navigation/header-context";
 
@@ -43,7 +44,7 @@ export function PartnerList({
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sort, setSort] = useState<string>("name");
+  const [activeView, setActiveView] = useState<string>("default");
 
   const catalogRes = useResource<{ data: PartnerCatalog }>(
     organization ? `${partnerRoot(organization.id)}/catalog` : null
@@ -69,32 +70,48 @@ export function PartnerList({
   );
 
   const catalog = catalogRes.data?.data;
-  const partners = partnersRes.data?.data || [];
+  const rawPartners = useMemo(
+    () => partnersRes.data?.data || [],
+    [partnersRes.data?.data]
+  );
 
-  const columnDefs = useMemo<ColDef<Partner>[]>(
-    () => [
+  const hasActiveFilters =
+    roleFilter !== "all" ||
+    countryFilter !== "all" ||
+    statusFilter !== "all" ||
+    search.trim() !== "";
+
+  const resetAllFilters = () => {
+    setRoleFilter("all");
+    setCountryFilter("all");
+    setStatusFilter("all");
+    setSearch("");
+  };
+
+  const columnDefs = useMemo<(ColDef<Partner> | ColGroupDef<Partner>)[]>(() => {
+    const allCols: (ColDef<Partner> | ColGroupDef<Partner>)[] = [
       {
-        headerName: "COMPANY / PARTNER",
+        headerName: "Partner Name",
         field: "name",
-        minWidth: 260,
-        flex: 1.5,
+        minWidth: 200,
+        pinned: "left",
         cellRenderer: (params: CustomCellRendererProps<Partner>) => {
           const partner = params.data;
           if (!partner) return null;
           return (
-            <div className="flex items-center gap-2.5 h-full py-1">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-900 border border-blue-200/60">
-                <Building2 size={15} />
+            <div className="flex items-center gap-2 h-full">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded bg-blue-50 text-blue-900 border border-blue-200/60">
+                <Building2 size={13} />
               </span>
               <div className="flex flex-col min-w-0 leading-tight">
                 <Link
                   href={`/partners/${partner.id}`}
-                  className="font-semibold text-slate-900 hover:text-blue-900 truncate"
+                  className="font-semibold text-slate-900 hover:text-blue-900 truncate text-xs"
                 >
                   {partner.name}
                 </Link>
-                <span className="text-[11px] text-slate-400 font-mono truncate mt-0.5">
-                  {partner.code || partner.legal_name || "Partner #" + partner.id}
+                <span className="text-[10px] text-slate-400 font-mono truncate">
+                  {partner.code || "Partner #" + partner.id}
                 </span>
               </div>
             </div>
@@ -102,87 +119,102 @@ export function PartnerList({
         },
       },
       {
-        headerName: "BUSINESS ROLES",
-        field: "roles",
-        minWidth: 190,
-        flex: 1,
-        valueGetter: (params) =>
-          params.data?.roles.map((r) => catalog?.roles[r] || r).join(", ") || "",
-        cellRenderer: (params: CustomCellRendererProps<Partner>) => {
-          const partner = params.data;
-          if (!partner) return null;
-          return (
-            <div className="flex items-center h-full text-xs font-medium text-slate-700">
-              {partner.roles.map((role: string) => catalog?.roles[role] || role).join(", ")}
-            </div>
-          );
-        },
+        headerName: "Organization & Roles",
+        headerClass: "ag-group-shipper",
+        children: [
+          {
+            headerName: "Business Roles",
+            field: "roles",
+            minWidth: 160,
+            flex: 1,
+            valueGetter: (params) =>
+              params.data?.roles.map((r) => catalog?.roles[r] || r).join(", ") || "",
+            cellRenderer: (params: CustomCellRendererProps<Partner>) => {
+              const partner = params.data;
+              if (!partner) return null;
+              return (
+                <div className="flex items-center h-full text-xs font-medium text-slate-700">
+                  {partner.roles.map((role: string) => catalog?.roles[role] || role).join(", ")}
+                </div>
+              );
+            },
+          },
+          {
+            headerName: "Country",
+            field: "country_code",
+            width: 120,
+            valueGetter: (params) =>
+              params.data ? catalog?.countries[params.data.country_code] || params.data.country_code : "",
+            cellRenderer: (params: CustomCellRendererProps<Partner>) => {
+              const partner = params.data;
+              if (!partner) return null;
+              return (
+                <span className="text-xs text-slate-700 font-mono">
+                  {catalog?.countries[partner.country_code] || partner.country_code}
+                </span>
+              );
+            },
+          },
+        ],
       },
       {
-        headerName: "COUNTRY",
-        field: "country_code",
-        width: 140,
-        valueGetter: (params) =>
-          params.data ? catalog?.countries[params.data.country_code] || params.data.country_code : "",
-        cellRenderer: (params: CustomCellRendererProps<Partner>) => {
-          const partner = params.data;
-          if (!partner) return null;
-          return (
-            <div className="flex items-center h-full text-xs text-slate-700">
-              {catalog?.countries[partner.country_code] || partner.country_code}
-            </div>
-          );
-        },
+        headerName: "Contact & Network",
+        headerClass: "ag-group-service",
+        children: [
+          {
+            headerName: "Direct Contact",
+            minWidth: 175,
+            flex: 1.1,
+            cellRenderer: (params: CustomCellRendererProps<Partner>) => {
+              const partner = params.data;
+              if (!partner) return null;
+              return (
+                <div className="flex items-center gap-1.5 h-full text-xs text-slate-700 truncate">
+                  {partner.email ? (
+                    <>
+                      <Mail size={12} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{partner.email}</span>
+                    </>
+                  ) : partner.phone ? (
+                    <>
+                      <Phone size={12} className="text-slate-400 shrink-0" />
+                      <span>{partner.phone}</span>
+                    </>
+                  ) : (
+                    <span className="text-slate-400 italic">No direct contact</span>
+                  )}
+                </div>
+              );
+            },
+          },
+          {
+            headerName: "Directory Sites",
+            width: 150,
+            cellRenderer: (params: CustomCellRendererProps<Partner>) => {
+              const partner = params.data;
+              if (!partner) return null;
+              return (
+                <div className="flex items-center gap-2 text-[11px] text-slate-600 font-mono">
+                  <span className="flex items-center gap-1">
+                    <Users size={11} className="text-slate-400" />
+                    <span>{partner.contacts_count}</span>
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  <span className="flex items-center gap-1">
+                    <MapPin size={11} className="text-slate-400" />
+                    <span>{partner.locations_count} sites</span>
+                  </span>
+                </div>
+              );
+            },
+          },
+        ],
       },
       {
-        headerName: "CONTACT & SITES",
-        minWidth: 220,
-        flex: 1,
-        cellRenderer: (params: CustomCellRendererProps<Partner>) => {
-          const partner = params.data;
-          if (!partner) return null;
-          return (
-            <div className="flex flex-col justify-center h-full py-1 leading-tight">
-              <span className="text-xs text-slate-800 truncate flex items-center gap-1.5">
-                {partner.email ? (
-                  <>
-                    <Mail size={12} className="text-slate-400 shrink-0" />
-                    <span className="truncate">{partner.email}</span>
-                  </>
-                ) : partner.phone ? (
-                  <>
-                    <Phone size={12} className="text-slate-400 shrink-0" />
-                    <span>{partner.phone}</span>
-                  </>
-                ) : (
-                  <span className="text-slate-400 italic">No direct contact</span>
-                )}
-              </span>
-              <div className="mt-1 flex items-center gap-2.5 text-[11px] text-slate-500 font-mono">
-                <Link
-                  href={`/partners/${partner.id}#contacts`}
-                  className="flex items-center gap-1 hover:text-blue-900"
-                >
-                  <Users size={11} className="text-slate-400" />
-                  <span>{partner.contacts_count} contacts</span>
-                </Link>
-                <span className="text-slate-300">•</span>
-                <Link
-                  href={`/partners/${partner.id}#locations`}
-                  className="flex items-center gap-1 hover:text-blue-900"
-                >
-                  <MapPin size={11} className="text-slate-400" />
-                  <span>{partner.locations_count} sites</span>
-                </Link>
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        headerName: "STATUS",
+        headerName: "Status",
         field: "archived_at",
-        width: 120,
+        width: 110,
+        floatingFilter: false,
         cellRenderer: (params: CustomCellRendererProps<Partner>) => {
           const partner = params.data;
           if (!partner) return null;
@@ -194,8 +226,8 @@ export function PartnerList({
         },
       },
       {
-        headerName: "ACTIONS",
-        width: 100,
+        headerName: "Actions",
+        width: 95,
         pinned: "right",
         sortable: false,
         filter: false,
@@ -219,9 +251,22 @@ export function PartnerList({
           );
         },
       },
-    ],
-    [catalog]
-  );
+    ];
+
+    if (activeView === "roles") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Partner Name", "Organization & Roles", "Status", "Actions"].includes(name || "");
+      });
+    }
+    if (activeView === "network") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Partner Name", "Contact & Network", "Status", "Actions"].includes(name || "");
+      });
+    }
+    return allCols;
+  }, [catalog, activeView]);
 
   if (!organization) return <NoOrganization />;
   if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
@@ -235,7 +280,7 @@ export function PartnerList({
         title={contactsMode ? "Contacts & Sites" : "Business Partners"}
         icon={Building2}
         tabs={[
-          { id: "all", label: "All Partners", count: partners.length },
+          { id: "all", label: "All Partners", count: rawPartners.length },
           { id: "shipper", label: "Shippers / Clients" },
           { id: "carrier", label: "Carriers & Fleet" },
           { id: "customs_broker", label: "Customs Brokers" },
@@ -260,58 +305,61 @@ export function PartnerList({
         }
         subHeader={
           <>
-            <div className="flex items-center gap-2 flex-wrap">
-              <FilterPill
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <FloatingFilterSelect
                 label="Role"
                 value={roleFilter}
-                options={[
-                  { value: "all", label: "All Roles" },
-                  ...Object.entries(catalog?.roles || {}).map(([val, lbl]) => ({
-                    value: val,
-                    label: lbl,
-                  })),
-                ]}
+                allLabel="All Roles"
+                options={Object.entries(catalog?.roles || {}).map(([val, lbl]) => ({
+                  value: val,
+                  label: lbl,
+                }))}
                 onChange={setRoleFilter}
+                minWidth="min-w-[130px]"
               />
-              <FilterPill
+              <FloatingFilterSelect
                 label="Country"
                 value={countryFilter}
-                options={[
-                  { value: "all", label: "All Countries" },
-                  ...Object.entries(catalog?.countries || {}).map(([code, name]) => ({
-                    value: code,
-                    label: `${code} - ${name}`,
-                  })),
-                ]}
+                allLabel="All Countries"
+                options={Object.entries(catalog?.countries || {}).map(([code, name]) => ({
+                  value: code,
+                  label: `${code} - ${name}`,
+                }))}
                 onChange={setCountryFilter}
+                minWidth="min-w-[140px]"
               />
-              <FilterPill
+              <FloatingFilterSelect
                 label="Status"
                 value={statusFilter}
+                allLabel="All Statuses"
                 options={[
-                  { value: "all", label: "All Statuses" },
                   { value: "active", label: "Active" },
                   { value: "archived", label: "Archived" },
                 ]}
                 onChange={setStatusFilter}
+                minWidth="min-w-[115px]"
               />
+              {hasActiveFilters && (
+                <FilterResetButton onReset={resetAllFilters} />
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <SortPill
-                value={sort}
-                options={[
-                  { value: "name", label: "Company name" },
-                  { value: "created_at", label: "Date added" },
+            <div className="flex items-center gap-2 shrink-0">
+              <ViewPresetSelector
+                activeView={activeView}
+                presets={[
+                  { id: "default", label: "Default View", desc: "All company details & contacts" },
+                  { id: "roles", label: "Roles & Regions", desc: "Shipper/carrier & country" },
+                  { id: "network", label: "Sites & Network", desc: "Phone, email & locations" },
                 ]}
-                onChange={setSort}
+                onSelectView={setActiveView}
               />
-              <ViewSettingsButton />
+              <ViewSettingsButton onClick={resetAllFilters} />
             </div>
           </>
         }
       />
 
-      {partners.length === 0 ? (
+      {rawPartners.length === 0 ? (
         <div className="p-8">
           <Empty
             title="No Partners Found"
@@ -330,7 +378,7 @@ export function PartnerList({
         </div>
       ) : (
         <MekongDataGrid<Partner>
-          rowData={partners}
+          rowData={rawPartners}
           columnDefs={columnDefs}
           title="Directory of Business Partners"
           quickFilterPlaceholder="Quick search partners..."

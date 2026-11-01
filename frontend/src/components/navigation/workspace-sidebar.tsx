@@ -33,6 +33,8 @@ import type { Organization, User } from "@/lib/types";
 import {
   navigationGroups,
   overview,
+  materialRequestsNav,
+  purchaseOrdersNav,
   itemMatchesPath,
   type NavigationGroup,
   type NavigationItem,
@@ -435,6 +437,22 @@ export function WorkspaceSidebar(props: Props) {
             compact={compact}
             onNavigate={finishNavigation}
           />
+          {(!materialRequestsNav.permission || props.can(materialRequestsNav.permission)) && (
+            <NavLink
+              item={materialRequestsNav}
+              path={path}
+              compact={compact}
+              onNavigate={finishNavigation}
+            />
+          )}
+          {(!purchaseOrdersNav.permission || props.can(purchaseOrdersNav.permission)) && (
+            <NavLink
+              item={purchaseOrdersNav}
+              path={path}
+              compact={compact}
+              onNavigate={finishNavigation}
+            />
+          )}
 
           {!compact && <div className="my-2 mx-1 border-t border-slate-100" />}
 

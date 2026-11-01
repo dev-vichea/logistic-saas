@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Route, ArrowRight, Truck, User, CheckCircle2, Clock } from "lucide-react";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, ColGroupDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { useWorkspace } from "@/components/workspace";
 import { NoOrganization, Loading, ErrorBox, Empty } from "@/components/common";
@@ -17,9 +17,10 @@ import { DispatchModal } from "./dispatch-modal";
 import { PodModal } from "./pod-modal";
 import {
   WorkspaceHeaderSlot,
-  FilterPill,
-  DateRangePill,
-  SortPill,
+  FloatingFilterSelect,
+  FloatingDateFilter,
+  ViewPresetSelector,
+  FilterResetButton,
   ViewSettingsButton,
 } from "@/components/navigation/header-context";
 
@@ -27,7 +28,10 @@ export function TripList() {
   const { organization, can } = useWorkspace();
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sort, setSort] = useState<string>("latest");
+  const [vehicleFilter, setVehicleFilter] = useState<string>("all");
+  const [driverFilter, setDriverFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [activeView, setActiveView] = useState<string>("default");
 
   const catalogRes = useResource<{ data: TransportationCatalog }>(
     organization ? `${transportRoot(organization.id)}/catalog` : null
@@ -41,8 +45,72 @@ export function TripList() {
     organization ? `${transportRoot(organization.id)}/trips?${queryParams.toString()}` : null
   );
 
-  const catalog = catalogRes.data?.data;
-  const rawTrips = tripsRes.data?.data || [];
+  const rawTrips = useMemo(
+    () => tripsRes.data?.data || [],
+    [tripsRes.data?.data]
+  );
+
+  const vehicleOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    rawTrips.forEach((t) => {
+      if (t.vehicle) {
+        map.set(String(t.vehicle.id), t.vehicle.plate_number);
+      }
+    });
+    return Array.from(map.entries()).map(([value, label]) => ({
+      value,
+      label,
+    }));
+  }, [rawTrips]);
+
+  const driverOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    rawTrips.forEach((t) => {
+      if (t.driver) {
+        map.set(String(t.driver.id), t.driver.full_name);
+      }
+    });
+    return Array.from(map.entries()).map(([value, label]) => ({
+      value,
+      label,
+    }));
+  }, [rawTrips]);
+
+  const hasActiveFilters =
+    statusFilter !== "all" ||
+    vehicleFilter !== "all" ||
+    driverFilter !== "all" ||
+    dateFilter !== "all" ||
+    search.trim() !== "";
+
+  const resetAllFilters = () => {
+    setStatusFilter("all");
+    setVehicleFilter("all");
+    setDriverFilter("all");
+    setDateFilter("all");
+    setSearch("");
+  };
+
+  const trips = useMemo(() => {
+    return rawTrips.filter((t) => {
+      if (statusFilter !== "all" && t.status !== statusFilter) return false;
+      if (vehicleFilter !== "all" && String(t.vehicle_id) !== vehicleFilter) return false;
+      if (driverFilter !== "all" && String(t.driver_id) !== driverFilter) return false;
+      if (dateFilter !== "all" && t.created_at) {
+        const d = new Date(t.created_at);
+        const now = new Date();
+        if (dateFilter === "today") {
+          if (d.toDateString() !== now.toDateString()) return false;
+        } else if (dateFilter === "this_week") {
+          const diff = (d.getTime() - now.getTime()) / (1000 * 3600 * 24);
+          if (diff < -1 || diff > 7) return false;
+        } else if (dateFilter === "this_month") {
+          if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return false;
+        }
+      }
+      return true;
+    });
+  }, [rawTrips, statusFilter, vehicleFilter, driverFilter, dateFilter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -59,18 +127,19 @@ export function TripList() {
     }
   };
 
-  const columnDefs = useMemo<ColDef<DispatchTrip>[]>(
-    () => [
+  // AG Grid Column Definitions with Vektor TMS Tinted Group Headers (100% Single-Line)
+  const columnDefs = useMemo<(ColDef<DispatchTrip> | ColGroupDef<DispatchTrip>)[]>(() => {
+    const allCols: (ColDef<DispatchTrip> | ColGroupDef<DispatchTrip>)[] = [
       {
         field: "trip_number",
         headerName: "Run-Sheet #",
-        minWidth: 180,
+        width: 155,
         pinned: "left",
         cellRenderer: (params: CustomCellRendererProps<DispatchTrip>) => {
           const t = params.data;
           if (!t) return null;
           return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight">
+            <div className="flex items-center gap-1.5 h-full">
               <Link
                 href={`/transport/trips/${t.id}`}
                 className="font-mono font-bold text-xs text-blue-950 hover:underline hover:text-blue-700 leading-none flex items-center gap-1.5"
@@ -78,73 +147,98 @@ export function TripList() {
                 <Route size={13} className="text-slate-400 shrink-0" />
                 <span>{t.trip_number}</span>
               </Link>
-              {t.trip_legs_count !== undefined && (
-                <span className="text-[10px] font-mono text-slate-400 mt-1 leading-none">
-                  {t.trip_legs_count} assigned {t.trip_legs_count === 1 ? "leg" : "legs"}
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Assignments",
+        headerClass: "ag-group-assignments",
+        children: [
+          {
+            headerName: "Assigned Vehicle",
+            width: 150,
+            cellRenderer: (params: CustomCellRendererProps<DispatchTrip>) => {
+              const t = params.data;
+              if (!t) return null;
+              if (!t.vehicle) return <span className="text-slate-400 text-xs italic">Unassigned</span>;
+              return (
+                <div className="flex items-center gap-1.5 font-semibold text-slate-800 text-xs">
+                  <Truck size={12} className="text-slate-400 shrink-0" />
+                  <span>{t.vehicle.plate_number}</span>
+                </div>
+              );
+            },
+          },
+          {
+            headerName: "Assigned Driver",
+            width: 160,
+            cellRenderer: (params: CustomCellRendererProps<DispatchTrip>) => {
+              const t = params.data;
+              if (!t) return null;
+              if (!t.driver) return <span className="text-slate-400 text-xs italic">Unassigned</span>;
+              return (
+                <div className="flex items-center gap-1.5 text-xs text-slate-800 font-medium">
+                  <User size={12} className="text-slate-400 shrink-0" />
+                  <span>{t.driver.full_name}</span>
+                </div>
+              );
+            },
+          },
+          {
+            field: "container_number",
+            headerName: "Equipment / Trailer",
+            width: 155,
+            cellRenderer: (params: CustomCellRendererProps<DispatchTrip>) => {
+              const t = params.data;
+              if (!t) return null;
+              return (
+                <span className="text-xs text-slate-700 font-mono">
+                  {t.container_number || t.trailer_vehicle?.plate_number || "Loose Cargo"}
                 </span>
-              )}
-            </div>
-          );
-        },
+              );
+            },
+          },
+        ],
       },
       {
-        headerName: "Vehicle & Driver",
-        minWidth: 200,
-        cellRenderer: (params: CustomCellRendererProps<DispatchTrip>) => {
-          const t = params.data;
-          if (!t) return null;
-          return (
-            <div className="flex flex-col justify-center h-full py-0.5 leading-tight">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-800 text-xs leading-none">
-                <Truck size={12} className="text-slate-400 shrink-0" />
-                <span>{t.vehicle ? t.vehicle.plate_number : "Unassigned Truck"}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1 leading-none">
-                <User size={11} className="text-slate-400 shrink-0" />
-                <span>{t.driver ? t.driver.full_name : "Unassigned Driver"}</span>
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        headerName: "Route",
-        minWidth: 220,
-        valueGetter: (params) => {
-          const t = params.data;
-          if (!t) return "";
-          return `${t.origin_location?.name || t.origin_location?.city || t.origin_location_id} to ${t.destination_location?.name || t.destination_location?.city || t.destination_location_id}`;
-        },
-        cellRenderer: (params: CustomCellRendererProps<DispatchTrip>) => {
-          const t = params.data;
-          if (!t) return null;
-          return (
-            <div className="flex items-center gap-1 h-full text-xs text-slate-700">
-              <span className="truncate font-medium">{t.origin_location?.city || t.origin_location?.name || `Loc #${t.origin_location_id}`}</span>
-              <ArrowRight size={11} className="text-slate-400 shrink-0" />
-              <span className="truncate font-medium">{t.destination_location?.city || t.destination_location?.name || `Loc #${t.destination_location_id}`}</span>
-            </div>
-          );
-        },
-      },
-      {
-        field: "container_number",
-        headerName: "Equipment / Container",
-        width: 170,
-        cellRenderer: (params: CustomCellRendererProps<DispatchTrip>) => {
-          const t = params.data;
-          if (!t) return null;
-          return (
-            <div className="flex items-center h-full text-xs text-slate-700 font-mono">
-              {t.container_number || t.trailer_vehicle?.plate_number || "Loose Cargo"}
-            </div>
-          );
-        },
+        headerName: "Routing",
+        headerClass: "ag-group-origin",
+        children: [
+          {
+            headerName: "Origin",
+            width: 140,
+            valueGetter: (params) => params.data?.origin_location?.city || params.data?.origin_location?.name || "",
+            cellRenderer: (params: CustomCellRendererProps<DispatchTrip>) => {
+              const t = params.data;
+              if (!t) return null;
+              return (
+                <span className="text-xs text-slate-700 truncate font-medium">
+                  {t.origin_location?.city || t.origin_location?.name || `Loc #${t.origin_location_id}`}
+                </span>
+              );
+            },
+          },
+          {
+            headerName: "Destination",
+            width: 140,
+            valueGetter: (params) => params.data?.destination_location?.city || params.data?.destination_location?.name || "",
+            cellRenderer: (params: CustomCellRendererProps<DispatchTrip>) => {
+              const t = params.data;
+              if (!t) return null;
+              return (
+                <span className="text-xs text-slate-700 truncate font-medium">
+                  {t.destination_location?.city || t.destination_location?.name || `Loc #${t.destination_location_id}`}
+                </span>
+              );
+            },
+          },
+        ],
       },
       {
         field: "status",
         headerName: "Status",
-        width: 150,
+        width: 145,
         floatingFilter: false,
         cellRenderer: (params: CustomCellRendererProps<DispatchTrip>) => {
           const t = params.data;
@@ -154,7 +248,7 @@ export function TripList() {
       },
       {
         headerName: "Actions",
-        width: 180,
+        width: 175,
         pinned: "right",
         sortable: false,
         filter: false,
@@ -180,14 +274,29 @@ export function TripList() {
           );
         },
       },
-    ],
-    [can, tripsRes]
-  );
+    ];
+
+    if (activeView === "assignments") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Run-Sheet #", "Assignments", "Status", "Actions"].includes(name || "");
+      });
+    }
+    if (activeView === "routing") {
+      return allCols.filter((col) => {
+        const name = "headerName" in col ? col.headerName : "";
+        return ["Run-Sheet #", "Routing", "Status", "Actions"].includes(name || "");
+      });
+    }
+    return allCols;
+  }, [activeView, can, tripsRes]);
 
   if (!organization) return <NoOrganization />;
   if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
   if (tripsRes.error) return <ErrorBox message={tripsRes.error} />;
-  if (!catalogRes.data || !catalog) return <Loading />;
+  if (!catalogRes.data) return <Loading />;
+
+  const catalog = catalogRes.data.data;
 
   return (
     <>
@@ -214,31 +323,60 @@ export function TripList() {
         }
         subHeader={
           <>
-            <div className="flex items-center gap-2 flex-wrap">
-              <DateRangePill />
-              <FilterPill
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <FloatingFilterSelect
                 label="Status"
                 value={statusFilter}
+                allLabel="All Statuses"
                 options={[
-                  { value: "all", label: "All Statuses" },
                   { value: "draft", label: "Draft Run-Sheet" },
                   { value: "in_transit", label: "In Transit" },
                   { value: "completed", label: "Completed & POD" },
                   { value: "cancelled", label: "Cancelled" },
                 ]}
                 onChange={setStatusFilter}
+                minWidth="min-w-[125px]"
               />
+              {vehicleOptions.length > 0 && (
+                <FloatingFilterSelect
+                  label="Vehicle"
+                  value={vehicleFilter}
+                  allLabel="All Vehicles"
+                  options={vehicleOptions}
+                  onChange={setVehicleFilter}
+                  minWidth="min-w-[125px]"
+                />
+              )}
+              {driverOptions.length > 0 && (
+                <FloatingFilterSelect
+                  label="Driver"
+                  value={driverFilter}
+                  allLabel="All Drivers"
+                  options={driverOptions}
+                  onChange={setDriverFilter}
+                  minWidth="min-w-[125px]"
+                />
+              )}
+              <FloatingDateFilter
+                label="Created"
+                value={dateFilter}
+                onChange={setDateFilter}
+              />
+              {hasActiveFilters && (
+                <FilterResetButton onReset={resetAllFilters} />
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <SortPill
-                value={sort}
-                options={[
-                  { value: "latest", label: "Latest created" },
-                  { value: "trip_number", label: "Trip number" },
+            <div className="flex items-center gap-2 shrink-0">
+              <ViewPresetSelector
+                activeView={activeView}
+                presets={[
+                  { id: "default", label: "Default View", desc: "All columns & assignments" },
+                  { id: "assignments", label: "Crew & Vehicle", desc: "Truck, driver & equipment" },
+                  { id: "routing", label: "Routing & Status", desc: "Origin/dest & progress" },
                 ]}
-                onChange={setSort}
+                onSelectView={setActiveView}
               />
-              <ViewSettingsButton />
+              <ViewSettingsButton onClick={resetAllFilters} />
             </div>
           </>
         }
@@ -247,12 +385,12 @@ export function TripList() {
       {/* Main Content: Full-Bleed AG Grid Table */}
       {!tripsRes.data && !tripsRes.error ? (
         <Loading />
-      ) : rawTrips.length === 0 ? (
+      ) : trips.length === 0 ? (
         <div className="p-6">
           <Empty
             title="No dispatch run-sheets found"
             description={
-              search || statusFilter !== "all"
+              search || hasActiveFilters
                 ? "No run-sheets match your current search or status filter."
                 : "Create your first dispatch run-sheet to coordinate vehicles, drivers, and cargo legs."
             }
@@ -262,7 +400,7 @@ export function TripList() {
       ) : (
         <div className="flex-1 min-h-0 w-full h-full flex flex-col">
           <MekongDataGrid<DispatchTrip>
-            rowData={rawTrips}
+            rowData={trips}
             columnDefs={columnDefs}
             fullScreen={true}
             quickFilterPlaceholder="Quick search in run-sheets..."
