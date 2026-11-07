@@ -176,7 +176,7 @@ export function NewQuotationDialog({
           New Quotation
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" size="lg" className="p-0">
+      <SheetContent side="right" size="4/5" className="p-0">
         <form onSubmit={handleSubmit} className="flex h-full flex-col">
           <SheetHeader>
             <div className="flex items-center gap-2">

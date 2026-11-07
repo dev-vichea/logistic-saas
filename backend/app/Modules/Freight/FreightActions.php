@@ -64,6 +64,10 @@ final class FreightActions
                 $quotation->lineItems()->create($item);
             }
 
+            if (! empty($data['freight_request_id'])) {
+                $organization->freightRequests()->where('id', $data['freight_request_id'])->update(['status' => 'quoted']);
+            }
+
             Audit::record($organization, 'quotation.created', ['quotation_id' => $quotation->id, 'number' => $quotation->quotation_number]);
 
             return $quotation->load('lineItems');

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Send } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Send, X } from "lucide-react";
 import { useWorkspace } from "@/components/workspace";
 import { ErrorBox, Loading, NoOrganization, formatDate } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RecordField, RecordPanel, RecordProgress } from "@/components/record-workspace/record-sections";
-import { RecordWorkspace, RelatedRecordButton } from "@/components/record-workspace/record-workspace";
+import { RecordDrawerShell, RecordWorkspace, RelatedRecordButton } from "@/components/record-workspace/record-workspace";
 import { api, errorMessage } from "@/lib/api";
 import { purchaseOrdersRoot, type PurchaseOrder } from "@/lib/purchase-orders";
 import { useResource } from "@/lib/use-resource";
@@ -20,6 +21,7 @@ export function PurchaseOrderDetail({ id }: { id: string }) {
 }
 
 function ScopedPurchaseOrderDetail({ id, organizationId }: { id: string; organizationId: number }) {
+  const router = useRouter();
   const { organization, can, notify } = useWorkspace();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -42,8 +44,38 @@ function ScopedPurchaseOrderDetail({ id, organizationId }: { id: string; organiz
     }
   }
 
-  if (resource.error) return <ErrorBox message={resource.error} />;
-  if (!resource.data || !organization) return <Loading />;
+  if (resource.error) {
+    return (
+      <RecordDrawerShell onClose={() => router.push("/purchase-orders")} ariaLabel="Purchase order error">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2">
+          <span className="text-xs font-semibold text-slate-500">Purchase Order</span>
+          <Button variant="ghost" size="sm" onClick={() => router.push("/purchase-orders")} className="gap-1.5 text-slate-600 hover:text-slate-900" aria-label="Close workspace">
+            <X size={16} />
+            <span>Close workspace</span>
+          </Button>
+        </div>
+        <div className="p-6">
+          <ErrorBox message={resource.error} />
+        </div>
+      </RecordDrawerShell>
+    );
+  }
+  if (!resource.data || !organization) {
+    return (
+      <RecordDrawerShell onClose={() => router.push("/purchase-orders")} ariaLabel="Loading purchase order">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2">
+          <span className="text-xs font-semibold text-slate-500">Loading order...</span>
+          <Button variant="ghost" size="sm" onClick={() => router.push("/purchase-orders")} className="gap-1.5 text-slate-600 hover:text-slate-900" aria-label="Close workspace">
+            <X size={16} />
+            <span>Close workspace</span>
+          </Button>
+        </div>
+        <div className="flex flex-1 items-center justify-center p-8">
+          <Loading />
+        </div>
+      </RecordDrawerShell>
+    );
+  }
   const order = resource.data.data;
   const editable = order.status === "draft" && can("purchase_orders.manage");
   const total = (order.items ?? []).reduce((sum, item) => sum + Number(item.quantity) * Number(item.unit_price), 0);

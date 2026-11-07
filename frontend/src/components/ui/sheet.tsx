@@ -28,7 +28,7 @@ function SheetOverlay({
 }
 
 const sheetVariants = cva(
-  "fixed z-50 flex flex-col bg-white shadow-2xl transition ease-in-out duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out",
+  "fixed z-50 flex flex-col bg-white shadow-2xl transition-all ease-in-out duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out",
   {
     variants: {
       side: {
@@ -46,6 +46,9 @@ const sheetVariants = cva(
         lg: "w-full sm:max-w-xl md:max-w-2xl",
         xl: "w-full sm:max-w-2xl md:max-w-3xl",
         "2xl": "w-full sm:max-w-3xl md:max-w-4xl",
+        "3xl": "w-full sm:max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl",
+        "3/4": "w-full lg:w-[75vw] lg:max-w-[75vw]",
+        "4/5": "w-full lg:w-[80vw] lg:max-w-[80vw]",
         full: "w-full sm:max-w-[100vw]",
       },
     },

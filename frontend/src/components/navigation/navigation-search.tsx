@@ -9,14 +9,18 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  navigationGroups,
-  overview,
-  materialRequestsNav,
-  purchaseOrdersNav,
+  dashboardNav,
+  myTasksNav,
+  commercialItems,
+  operationsGroups,
+  businessGroups,
+  systemGroups,
+  procurementItems,
   type NavigationItem,
 } from "@/lib/navigation";
 
 type SearchEntry = NavigationItem & { group: string };
+
 export function NavigationSearch({
   open,
   onOpenChange,
@@ -32,20 +36,33 @@ export function NavigationSearch({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const list = useRef<HTMLDivElement>(null);
+
   const entries: SearchEntry[] = [
-    { ...overview, group: "Workspace" },
-    ...(!materialRequestsNav.permission || can(materialRequestsNav.permission)
-      ? [{ ...materialRequestsNav, group: "Workspace" }]
-      : []),
-    ...(!purchaseOrdersNav.permission || can(purchaseOrdersNav.permission)
-      ? [{ ...purchaseOrdersNav, group: "Workspace" }]
-      : []),
-    ...navigationGroups.flatMap((group) =>
+    { ...dashboardNav, group: "Workspace" },
+    { ...myTasksNav, group: "Workspace" },
+    ...commercialItems
+      .filter((item) => !item.permission || can(item.permission))
+      .map((item) => ({ ...item, group: "Commercial" })),
+    ...operationsGroups.flatMap((group) =>
       group.items
         .filter((item) => !item.permission || can(item.permission))
-        .map((item) => ({ ...item, group: group.label })),
+        .map((item) => ({ ...item, group: `Operations · ${group.label}` })),
     ),
+    ...businessGroups.flatMap((group) =>
+      group.items
+        .filter((item) => !item.permission || can(item.permission))
+        .map((item) => ({ ...item, group: `Business · ${group.label}` })),
+    ),
+    ...systemGroups.flatMap((group) =>
+      group.items
+        .filter((item) => !item.permission || can(item.permission))
+        .map((item) => ({ ...item, group: `System · ${group.label}` })),
+    ),
+    ...procurementItems
+      .filter((item) => !item.permission || can(item.permission))
+      .map((item) => ({ ...item, group: "Procurement (Optional)" })),
   ];
+
   const matches = entries.filter((item) =>
     `${item.label} ${item.group} ${item.description}`
       .toLowerCase()
@@ -53,18 +70,21 @@ export function NavigationSearch({
   );
   const available = matches.filter((item) => item.href);
   const active = available[selected] || available[0];
+
   useEffect(() => {
     if (active)
       list.current
         ?.querySelector(`[data-result="${active.id}"]`)
         ?.scrollIntoView({ block: "nearest" });
   }, [active]);
+
   function navigate(item: SearchEntry) {
     if (!item.href) return;
     onOpenChange(false);
     onNavigate();
     router.push(item.href);
   }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -84,11 +104,10 @@ export function NavigationSearch({
       >
         <DialogTitle className="sr-only">Search navigation</DialogTitle>
         <DialogDescription className="sr-only">
-          Find a workspace page. Planned modules are visible but unavailable in
-          v0.2.
+          Find a ShipFlow logistics module, tool or setting.
         </DialogDescription>
-        <div className="flex items-center gap-3 border-b px-5 py-4">
-          <Search size={19} className="shrink-0 text-primary" />
+        <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-3.5 bg-slate-50/50">
+          <Search size={18} className="shrink-0 text-blue-900" />
           <input
             autoFocus
             role="combobox"
@@ -99,8 +118,8 @@ export function NavigationSearch({
             aria-activedescendant={
               active ? `navigation-result-${active.id}` : undefined
             }
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            placeholder="Where would you like to go?"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400 font-sans"
+            placeholder="Search ShipFlow navigation (e.g. shipments, dispatch, bills, customs)..."
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -127,7 +146,7 @@ export function NavigationSearch({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground"
+            className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-mono text-slate-500 shadow-2xs"
             aria-label="Close navigation search"
           >
             Esc
@@ -141,13 +160,13 @@ export function NavigationSearch({
           className="max-h-[min(58dvh,450px)] overflow-y-auto p-2"
         >
           {!matches.length && (
-            <p className="px-4 py-12 text-center text-sm text-muted-foreground">
-              No pages found. Try “partners”, “team” or “documents”.
+            <p className="px-4 py-12 text-center text-sm text-slate-500">
+              No matching modules found. Try &ldquo;shipments&rdquo;, &ldquo;dispatch&rdquo; or &ldquo;customs&rdquo;.
             </p>
           )}
           {matches.map((item) => (
             <button
-              key={item.id}
+              key={`${item.group}-${item.id}`}
               id={`navigation-result-${item.id}`}
               data-result={item.id}
               type="button"
@@ -161,31 +180,50 @@ export function NavigationSearch({
                 if (index >= 0) setSelected(index);
               }}
               onClick={() => navigate(item)}
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors ${active?.id === item.id ? "bg-emerald-50 text-primary" : "text-foreground"} disabled:opacity-50`}
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                active?.id === item.id
+                  ? "bg-blue-50 text-blue-950 font-medium"
+                  : "text-slate-700 hover:bg-slate-50"
+              } disabled:opacity-45`}
             >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-white">
-                <item.icon size={17} />
+              <span
+                className={`flex size-8 shrink-0 items-center justify-center rounded-lg border ${
+                  active?.id === item.id
+                    ? "border-blue-200 bg-white text-blue-900"
+                    : "border-slate-200 bg-slate-50 text-slate-500"
+                }`}
+              >
+                <item.icon size={16} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-xs font-medium">{item.label}</span>
-                <span className="mt-1 block truncate text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-2">
+                  <span className="block text-xs font-semibold text-slate-900">
+                    {item.label}
+                  </span>
+                  {item.badge && (
+                    <span className="rounded bg-blue-100 px-1.5 py-0.2 font-mono text-[9px] font-bold text-blue-800">
+                      {item.badge}
+                    </span>
+                  )}
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] text-slate-500">
                   {item.group} · {item.description}
                 </span>
               </span>
               {item.href ? (
-                <ArrowUpRight size={14} className="shrink-0" />
+                <ArrowUpRight size={14} className="shrink-0 text-slate-400" />
               ) : (
                 <span className="sidebar-planned">Planned</span>
               )}
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/40 px-4 py-3 text-[10px] text-muted-foreground">
-          <span>Planned modules are part of the platform roadmap.</span>
-          <span className="flex items-center gap-2">
-            <span>↑ ↓ to move</span>
-            <CornerDownLeft size={12} />
-            <span>to open</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-2.5 text-[10px] text-slate-500">
+          <span>ShipFlow Transportation & Logistics SaaS</span>
+          <span className="flex items-center gap-2 font-mono">
+            <span>↑ ↓ navigate</span>
+            <CornerDownLeft size={11} />
+            <span>select</span>
           </span>
         </div>
       </DialogContent>

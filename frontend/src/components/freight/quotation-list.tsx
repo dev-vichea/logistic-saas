@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   FileText,
   Building2,
   CheckCircle2,
   Clock,
   XCircle,
+  Plus,
 } from "lucide-react";
-import type { ColDef, ColGroupDef } from "ag-grid-community";
+import type { ColDef, ColGroupDef, RowDoubleClickedEvent } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { useWorkspace } from "@/components/workspace";
 import { NoOrganization, Loading, ErrorBox, Empty } from "@/components/common";
@@ -19,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api, errorMessage } from "@/lib/api";
 import { MekongDataGrid } from "@/components/ui/data-grid";
-import { NewQuotationDialog } from "./new-quotation-dialog";
+import { QuotationStudioWorkspace } from "./quotation-studio-workspace";
 import {
   WorkspaceHeaderSlot,
   FloatingFilterSelect,
@@ -31,6 +33,9 @@ import {
 
 export function QuotationList() {
   const { organization, can } = useWorkspace();
+  const searchParams = useSearchParams();
+  const createFromId = searchParams.get("create_from");
+
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [modeFilter, setModeFilter] = useState<string>("all");
@@ -38,6 +43,13 @@ export function QuotationList() {
   const [validityFilter, setValidityFilter] = useState<string>("all");
   const [activeView, setActiveView] = useState<string>("default");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  // Split-Screen Quotation Studio state
+  const [studioOpen, setStudioOpen] = useState(() => Boolean(createFromId));
+  const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
+  const [initialRequestId, setInitialRequestId] = useState<number | null>(() =>
+    createFromId ? Number(createFromId) : null,
+  );
 
   const catalogRes = useResource<{ data: FreightCatalog }>(
     organization ? `${freightRoot(organization.id)}/catalog` : null
@@ -68,6 +80,19 @@ export function QuotationList() {
       value,
       label,
     }));
+  }, [rawQuotations]);
+
+  const nextQuoteNumber = useMemo(() => {
+    const year = new Date().getFullYear();
+    let maxSeq = 0;
+    for (const q of rawQuotations) {
+      const match = q.quotation_number?.match(/QUO-(\d{4})-(\d+)/);
+      if (match && Number(match[1]) === year) {
+        const seq = Number(match[2]);
+        if (seq > maxSeq) maxSeq = seq;
+      }
+    }
+    return `QUO-${year}-${String(maxSeq + 1).padStart(4, "0")}`;
   }, [rawQuotations]);
 
   const hasActiveFilters =
@@ -143,20 +168,29 @@ export function QuotationList() {
       {
         field: "quotation_number",
         headerName: "Quote ID",
-        width: 140,
+        width: 145,
         pinned: "left",
         cellRenderer: (params: CustomCellRendererProps<Quotation>) => {
           const q = params.data;
           if (!q) return null;
           return (
-            <div className="flex items-center gap-1.5 h-full">
-              <span className="font-semibold text-slate-900 font-mono text-xs leading-none">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedQuotation(q);
+                setInitialRequestId(null);
+                setStudioOpen(true);
+              }}
+              className="flex items-center gap-1.5 h-full text-left group cursor-pointer"
+              title="Open Live Quotation Studio & PDF"
+            >
+              <span className="font-semibold text-blue-950 group-hover:text-blue-700 group-hover:underline font-mono text-xs leading-none">
                 {q.quotation_number}
               </span>
               <span className="text-[10px] font-mono text-slate-500 font-medium bg-slate-100 px-1 py-0.5 rounded">
                 R{q.revision}
               </span>
-            </div>
+            </button>
           );
         },
       },
@@ -303,7 +337,7 @@ export function QuotationList() {
       },
       {
         headerName: "Actions",
-        width: 145,
+        width: 175,
         pinned: "right",
         sortable: false,
         filter: false,
@@ -313,6 +347,20 @@ export function QuotationList() {
           if (!q) return null;
           return (
             <div className="flex items-center justify-end gap-1.5 h-full">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setSelectedQuotation(q);
+                  setInitialRequestId(null);
+                  setStudioOpen(true);
+                }}
+                className="h-6 text-[11px] px-1.5 text-blue-900 hover:text-blue-700 hover:bg-blue-50 font-medium flex items-center gap-1"
+                title="Open Live Quotation Studio & View A4 PDF"
+              >
+                <FileText size={12} className="text-blue-600" />
+                <span>PDF</span>
+              </Button>
               {can("freight.manage") && q.status === "draft" && (
                 <Button
                   size="sm"
@@ -381,7 +429,17 @@ export function QuotationList() {
         searchPlaceholder="Search quotation #, customer..."
         primaryAction={
           can("freight.manage") ? (
-            <NewQuotationDialog catalog={catalog} onCreated={quotationsRes.reload} />
+            <Button
+              onClick={() => {
+                setSelectedQuotation(null);
+                setInitialRequestId(null);
+                setStudioOpen(true);
+              }}
+              className="h-8 gap-1.5 px-3 bg-blue-900 hover:bg-blue-800 text-white font-semibold text-xs shadow-2xs"
+            >
+              <Plus size={14} />
+              <span>Create Quotation</span>
+            </Button>
           ) : null
         }
         subHeader={
@@ -468,7 +526,21 @@ export function QuotationList() {
                 ? "No quotations match your current filters or search query."
                 : "Quotations generated for customer freight inquiries will appear here with full revision history."
             }
-            action={can("freight.manage") ? <NewQuotationDialog catalog={catalog} onCreated={quotationsRes.reload} /> : null}
+            action={
+              can("freight.manage") ? (
+                <Button
+                  onClick={() => {
+                    setSelectedQuotation(null);
+                    setInitialRequestId(null);
+                    setStudioOpen(true);
+                  }}
+                  className="gap-2 bg-blue-900 hover:bg-blue-800 text-white text-xs shadow-2xs font-semibold"
+                >
+                  <Plus size={14} />
+                  <span>Create Quotation</span>
+                </Button>
+              ) : null
+            }
           />
         </div>
       ) : (
@@ -478,9 +550,34 @@ export function QuotationList() {
             columnDefs={columnDefs}
             fullScreen={true}
             quickFilterPlaceholder="Quick search in quotations..."
+            onRowDoubleClicked={(e: RowDoubleClickedEvent<Quotation>) => {
+              if (e.data) {
+                setSelectedQuotation(e.data);
+                setInitialRequestId(null);
+                setStudioOpen(true);
+              }
+            }}
           />
         </div>
       )}
+
+      {/* Split-Screen Interactive Quotation Studio with Realtime A4 PDF Sheet */}
+      <QuotationStudioWorkspace
+        key={
+          selectedQuotation?.id
+            ? `quote-${selectedQuotation.id}`
+            : initialRequestId
+            ? `req-${initialRequestId}`
+            : "new-quote"
+        }
+        open={studioOpen}
+        onOpenChange={setStudioOpen}
+        catalog={catalog}
+        existingQuotation={selectedQuotation}
+        initialRequestId={initialRequestId}
+        defaultQuoteNumber={nextQuoteNumber}
+        onSaved={quotationsRes.reload}
+      />
     </>
   );
 }

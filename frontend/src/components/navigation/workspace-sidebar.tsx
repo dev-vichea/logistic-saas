@@ -1,4 +1,5 @@
 "use client";
+
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,10 +18,8 @@ import {
   ArrowUpRight,
   Sparkles,
   Pin,
-  Package,
-  Route,
-  Landmark,
   Files,
+  ListTodo,
 } from "lucide-react";
 import { Brand } from "@/components/brand";
 import {
@@ -29,29 +28,41 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import type { Organization, User } from "@/lib/types";
 import {
-  navigationGroups,
-  overview,
-  materialRequestsNav,
-  purchaseOrdersNav,
+  dashboardNav,
+  myTasksNav,
+  commercialItems,
+  operationsGroups,
+  businessGroups,
+  systemGroups,
+  procurementItems,
   itemMatchesPath,
   type NavigationGroup,
   type NavigationItem,
 } from "@/lib/navigation";
 import { NavigationSearch } from "./navigation-search";
 
-const compactKey = "mekong.sidebar.compact";
+const compactKey = "shipflow.sidebar.compact";
 let memoryCompact = false;
 let storageUnavailable = false;
+
 function subscribe(listener: () => void) {
   window.addEventListener("storage", listener);
-  window.addEventListener("mekong-sidebar", listener);
+  window.addEventListener("shipflow-sidebar", listener);
   return () => {
     window.removeEventListener("storage", listener);
-    window.removeEventListener("mekong-sidebar", listener);
+    window.removeEventListener("shipflow-sidebar", listener);
   };
 }
+
 function compactSnapshot() {
   if (storageUnavailable) return memoryCompact;
   try {
@@ -60,6 +71,7 @@ function compactSnapshot() {
     return memoryCompact;
   }
 }
+
 export function useSidebarCompact() {
   const compact = useSyncExternalStore(subscribe, compactSnapshot, () => false);
   function toggle() {
@@ -69,7 +81,7 @@ export function useSidebarCompact() {
     } catch {
       storageUnavailable = true;
     }
-    window.dispatchEvent(new Event("mekong-sidebar"));
+    window.dispatchEvent(new Event("shipflow-sidebar"));
   }
   return { compact, toggle };
 }
@@ -91,13 +103,14 @@ type Props = {
 };
 
 const menuClass =
-  "sidebar-menu z-[70] min-w-56 max-w-80 rounded-xl border bg-white p-1.5 text-foreground shadow-xl";
+  "sidebar-menu z-[70] min-w-56 max-w-80 rounded-xl border border-slate-200 bg-white p-1.5 text-foreground shadow-xl";
 
 export function WorkspaceSidebar(props: Props) {
   const { onMobileOpenChange, onSearchOpenChange } = props;
   const path = usePathname();
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
-  const [frequentOpen, setFrequentOpen] = useState(true);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const [procurementOpen, setProcurementOpen] = useState(false);
 
   const searchOpen =
     props.searchOpen !== undefined ? props.searchOpen : internalSearchOpen;
@@ -115,15 +128,6 @@ export function WorkspaceSidebar(props: Props) {
     },
     [props.searchOpen, onSearchOpenChange],
   );
-
-  const groups = navigationGroups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(
-        (item) => !item.permission || props.can(item.permission),
-      ),
-    }))
-    .filter((group) => group.items.length);
 
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
@@ -158,7 +162,7 @@ export function WorkspaceSidebar(props: Props) {
 
   const orgInitial = props.organization?.name
     ? props.organization.name.charAt(0).toUpperCase()
-    : "M";
+    : "S";
 
   const userInitials = props.user.name
     ? props.user.name
@@ -168,6 +172,34 @@ export function WorkspaceSidebar(props: Props) {
         .join("")
         .toUpperCase()
     : "U";
+
+  // Filter groups by user permissions
+  const filterGroup = (group: NavigationGroup) => ({
+    ...group,
+    items: group.items.filter(
+      (item) => !item.permission || props.can(item.permission),
+    ),
+  });
+
+  const filteredOperations = operationsGroups
+    .map(filterGroup)
+    .filter((g) => g.items.length > 0);
+
+  const filteredBusiness = businessGroups
+    .map(filterGroup)
+    .filter((g) => g.items.length > 0);
+
+  const filteredSystem = systemGroups
+    .map(filterGroup)
+    .filter((g) => g.items.length > 0);
+
+  const filteredCommercial = commercialItems.filter(
+    (item) => !item.permission || props.can(item.permission),
+  );
+
+  const filteredProcurement = procurementItems.filter(
+    (item) => !item.permission || props.can(item.permission),
+  );
 
   function content(compact: boolean, mobile: boolean) {
     return (
@@ -180,7 +212,7 @@ export function WorkspaceSidebar(props: Props) {
         >
           <Link
             href="/dashboard"
-            aria-label="Mekong home"
+            aria-label="ShipFlow home"
             onClick={finishNavigation}
             className="flex items-center gap-2"
           >
@@ -209,7 +241,7 @@ export function WorkspaceSidebar(props: Props) {
             ))}
         </div>
 
-        {/* Vektor Organization Header Card with Native Select Underneath */}
+        {/* Organization Header Card / Switcher */}
         <div className={compact ? "px-3 pt-3" : "px-3 pt-3 pb-1"}>
           {compact ? (
             <DropdownMenu.Root>
@@ -218,7 +250,7 @@ export function WorkspaceSidebar(props: Props) {
                   type="button"
                   aria-label="Switch organization"
                   title={props.organization?.name || "Organizations"}
-                  className="relative flex size-10 w-full items-center justify-center rounded-xl bg-blue-950 font-mono text-xs font-bold text-white shadow-2xs hover:bg-blue-900"
+                  className="relative flex size-10 w-full items-center justify-center rounded-xl bg-blue-950 font-mono text-xs font-bold text-white shadow-2xs hover:bg-blue-900 transition-colors"
                 >
                   {props.switching ? (
                     <Loader2 size={16} className="animate-spin text-white" />
@@ -238,7 +270,7 @@ export function WorkspaceSidebar(props: Props) {
                   sideOffset={12}
                   className={menuClass}
                 >
-                  <DropdownMenu.Label className="px-3 py-2 text-[10px] font-semibold text-muted-foreground">
+                  <DropdownMenu.Label className="px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                     SWITCH ORGANIZATION
                   </DropdownMenu.Label>
                   <div className="max-h-72 overflow-y-auto">
@@ -294,8 +326,8 @@ export function WorkspaceSidebar(props: Props) {
                     {props.organization?.tax_number
                       ? `TIN: ${props.organization.tax_number}`
                       : props.organization?.registration_number
-                      ? `MOC_REG: ${props.organization.registration_number}`
-                      : `${props.organization?.country_code || "KH"} REG · ACTIVE`}
+                      ? `REG: ${props.organization.registration_number}`
+                      : `${props.organization?.country_code || "SEA"} · ACTIVE HUB`}
                   </div>
                 </div>
                 <ChevronsUpDown
@@ -339,8 +371,10 @@ export function WorkspaceSidebar(props: Props) {
             <Search size={15} />
             {!compact && (
               <>
-                <span className="flex-1 text-left">Search navigation</span>
-                <kbd className="rounded border bg-white px-1 py-0.5 text-[9px] text-muted-foreground">
+                <span className="flex-1 text-left text-slate-500 font-normal">
+                  Search navigation
+                </span>
+                <kbd className="rounded border bg-white px-1 py-0.5 font-mono text-[9px] text-muted-foreground shadow-2xs">
                   ⌘ K
                 </kbd>
               </>
@@ -351,113 +385,100 @@ export function WorkspaceSidebar(props: Props) {
         {/* Scrollable Navigation Area */}
         <nav
           aria-label="Main navigation"
-          className={`sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-3 ${
-            compact ? "px-3" : "px-3"
+          className={`sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 ${
+            compact ? "px-2.5" : "px-3"
           }`}
         >
-          {/* Frequently Used Section (Vektor Style) */}
+          {/* ═════════════════════════════════════════════════════════ */}
+          {/* 1. WORKSPACE                                             */}
+          {/* ═════════════════════════════════════════════════════════ */}
           {!compact && (
-            <div className="mb-2">
-              <button
-                type="button"
-                onClick={() => setFrequentOpen(!frequentOpen)}
-                className="flex w-full items-center justify-between px-2 py-1 text-[10px] font-semibold tracking-wider text-slate-400 uppercase hover:text-slate-700"
-              >
-                <span>Frequently Used</span>
-                <ChevronRight
-                  size={12}
-                  className={`transition-transform duration-150 ${
-                    frequentOpen ? "rotate-90" : ""
-                  }`}
-                />
-              </button>
-              {frequentOpen && (
-                <div className="mt-1 space-y-0.5">
-                  <Link
-                    href="/freight/shipments"
-                    aria-label="Quick Shipments"
-                    onClick={finishNavigation}
-                    className={`sidebar-live-link ${
-                      path.startsWith("/freight/shipments") ? "is-active" : ""
-                    }`}
-                  >
-                    <Package size={14} />
-                    <span className="flex-1">Shipments</span>
-                  </Link>
-                  <Link
-                    href="/transport/trips"
-                    aria-label="Quick Dispatch"
-                    onClick={finishNavigation}
-                    className={`sidebar-live-link ${
-                      path.startsWith("/transport/trips") ? "is-active" : ""
-                    }`}
-                  >
-                    <Route size={14} />
-                    <span className="flex-1">Dispatch runs</span>
-                    <span className="rounded bg-blue-100 px-1.5 py-0.2 text-[9px] font-bold text-blue-800">
-                      Live
-                    </span>
-                  </Link>
-                  <Link
-                    href="/customs"
-                    aria-label="Quick Customs"
-                    onClick={finishNavigation}
-                    className={`sidebar-live-link ${
-                      path.startsWith("/customs") ? "is-active" : ""
-                    }`}
-                  >
-                    <Landmark size={14} />
-                    <span className="flex-1">Customs SAD</span>
-                  </Link>
-                  <Link
-                    href="/documents"
-                    aria-label="Quick Document Vault"
-                    onClick={finishNavigation}
-                    className={`sidebar-live-link ${
-                      path.startsWith("/documents") ? "is-active" : ""
-                    }`}
-                  >
-                    <Files size={14} />
-                    <span className="flex-1">Document Vault</span>
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-
-          {!compact && (
-            <p className="px-2 pt-2 pb-1.5 text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
+            <p className="px-2 pt-2 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
               WORKSPACE
             </p>
           )}
 
-          <NavLink
-            item={overview}
-            path={path}
-            compact={compact}
-            onNavigate={finishNavigation}
-          />
-          {(!materialRequestsNav.permission || props.can(materialRequestsNav.permission)) && (
+          <div className="space-y-0.5">
             <NavLink
-              item={materialRequestsNav}
+              item={dashboardNav}
               path={path}
               compact={compact}
               onNavigate={finishNavigation}
             />
-          )}
-          {(!purchaseOrdersNav.permission || props.can(purchaseOrdersNav.permission)) && (
-            <NavLink
-              item={purchaseOrdersNav}
-              path={path}
-              compact={compact}
-              onNavigate={finishNavigation}
-            />
+
+            {/* My Tasks Item */}
+            {compact ? (
+              <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setTasksOpen(true)}
+                    className="sidebar-rail-link relative"
+                    aria-label="My Tasks"
+                  >
+                    <myTasksNav.icon size={20} />
+                    <span className="absolute top-2 right-2 size-2 rounded-full bg-blue-600 ring-2 ring-white" />
+                  </button>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content
+                    side="right"
+                    sideOffset={12}
+                    className="z-[80] rounded-lg bg-foreground px-3 py-2 text-xs text-white"
+                  >
+                    My Tasks (3 pending)
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setTasksOpen(true)}
+                className="sidebar-live-link group"
+              >
+                <myTasksNav.icon size={15} className="text-slate-500 group-hover:text-slate-800" />
+                <span className="flex-1 truncate">{myTasksNav.label}</span>
+                <span className="rounded-full bg-blue-100 px-1.5 py-0.2 font-mono text-[10px] font-bold text-blue-800">
+                  3
+                </span>
+              </button>
+            )}
+          </div>
+
+          {/* ═════════════════════════════════════════════════════════ */}
+          {/* 2. COMMERCIAL                                            */}
+          {/* ═════════════════════════════════════════════════════════ */}
+          <div className="my-2 border-t border-slate-100" />
+          {!compact && (
+            <p className="px-2 pt-1 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              COMMERCIAL
+            </p>
           )}
 
-          {!compact && <div className="my-2 mx-1 border-t border-slate-100" />}
+          <div className="space-y-0.5">
+            {filteredCommercial.map((item) => (
+              <NavLink
+                key={item.id}
+                item={item}
+                path={path}
+                compact={compact}
+                onNavigate={finishNavigation}
+              />
+            ))}
+          </div>
 
-          <div className={compact ? "mt-2 space-y-1.5" : "space-y-1"}>
-            {groups.map((group) =>
+          {/* ═════════════════════════════════════════════════════════ */}
+          {/* 3. OPERATIONS                                            */}
+          {/* ═════════════════════════════════════════════════════════ */}
+          <div className="my-2 border-t border-slate-100" />
+          {!compact && (
+            <p className="px-2 pt-1 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              OPERATIONS
+            </p>
+          )}
+
+          <div className={compact ? "space-y-1.5" : "space-y-1"}>
+            {filteredOperations.map((group) =>
               compact ? (
                 <RailGroup
                   key={group.id}
@@ -481,61 +502,158 @@ export function WorkspaceSidebar(props: Props) {
             )}
           </div>
 
-          {/* Vektor AI Assistant Widget */}
+          {/* ═════════════════════════════════════════════════════════ */}
+          {/* 4. BUSINESS                                              */}
+          {/* ═════════════════════════════════════════════════════════ */}
+          <div className="my-2 border-t border-slate-100" />
+          {!compact && (
+            <p className="px-2 pt-1 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              BUSINESS
+            </p>
+          )}
+
+          <div className={compact ? "space-y-1.5" : "space-y-1"}>
+            {filteredBusiness.map((group) =>
+              compact ? (
+                <RailGroup
+                  key={group.id}
+                  group={group}
+                  path={path}
+                  onNavigate={finishNavigation}
+                />
+              ) : (
+                <ExpandedGroup
+                  key={`${group.id}-${
+                    group.items.some((item) => itemMatchesPath(item, path))
+                      ? path
+                      : "idle"
+                  }-${mobile ? "mobile" : "desktop"}`}
+                  group={group}
+                  path={path}
+                  onNavigate={finishNavigation}
+                  mobile={mobile}
+                />
+              ),
+            )}
+          </div>
+
+          {/* ═════════════════════════════════════════════════════════ */}
+          {/* 5. SYSTEM                                                */}
+          {/* ═════════════════════════════════════════════════════════ */}
+          <div className="my-2 border-t border-slate-100" />
+          {!compact && (
+            <p className="px-2 pt-1 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              SYSTEM
+            </p>
+          )}
+
+          <div className={compact ? "space-y-1.5" : "space-y-1"}>
+            {filteredSystem.map((group) =>
+              compact ? (
+                <RailGroup
+                  key={group.id}
+                  group={group}
+                  path={path}
+                  onNavigate={finishNavigation}
+                />
+              ) : (
+                <ExpandedGroup
+                  key={`${group.id}-${
+                    group.items.some((item) => itemMatchesPath(item, path))
+                      ? path
+                      : "idle"
+                  }-${mobile ? "mobile" : "desktop"}`}
+                  group={group}
+                  path={path}
+                  onNavigate={finishNavigation}
+                  mobile={mobile}
+                />
+              ),
+            )}
+          </div>
+
+          {/* ═════════════════════════════════════════════════════════ */}
+          {/* OPTIONAL PROCUREMENT (PRESERVED)                         */}
+          {/* ═════════════════════════════════════════════════════════ */}
+          {filteredProcurement.length > 0 && (
+            <>
+              <div className="my-2 border-t border-slate-100" />
+              {!compact ? (
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setProcurementOpen(!procurementOpen)}
+                    className="flex w-full items-center justify-between px-2 py-1 text-[10px] font-semibold tracking-wider text-slate-400 uppercase hover:text-slate-700"
+                  >
+                    <span>Procurement (Optional)</span>
+                    <ChevronRight
+                      size={12}
+                      className={`transition-transform duration-150 ${
+                        procurementOpen ? "rotate-90" : ""
+                      }`}
+                    />
+                  </button>
+                  {procurementOpen && (
+                    <div className="mt-1 space-y-0.5">
+                      {filteredProcurement.map((item) => (
+                        <NavLink
+                          key={item.id}
+                          item={item}
+                          path={path}
+                          compact={compact}
+                          onNavigate={finishNavigation}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Tooltip.Root>
+                  <Tooltip.Trigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setProcurementOpen(!procurementOpen)}
+                      className="sidebar-rail-link opacity-70"
+                      aria-label="Procurement modules"
+                    >
+                      <Files size={18} />
+                    </button>
+                  </Tooltip.Trigger>
+                  <Tooltip.Portal>
+                    <Tooltip.Content
+                      side="right"
+                      sideOffset={12}
+                      className="z-[80] rounded-lg bg-foreground px-3 py-2 text-xs text-white"
+                    >
+                      Procurement (Material Requests & POs)
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip.Root>
+              )}
+            </>
+          )}
+
+          {/* ShipFlow Logistics Assistant Widget */}
           {!compact && (
             <div className="mt-4 pt-1">
               <button
                 type="button"
                 onClick={openSearch}
                 className="group flex w-full items-center justify-between rounded-xl border border-slate-200/90 bg-gradient-to-r from-slate-50 to-blue-50/50 p-2 text-xs font-semibold text-slate-800 shadow-2xs transition-all hover:border-blue-300 hover:bg-blue-50/80"
-                title="Logistics Assistant (⌘J / ⌘K)"
+                title="ShipFlow Assistant (⌘J / ⌘K)"
               >
                 <div className="flex items-center gap-2">
-                  <div className="flex size-6 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-600 via-blue-600 to-sky-400 text-white shadow-2xs">
+                  <div className="flex size-6 items-center justify-center rounded-lg bg-gradient-to-tr from-blue-900 via-blue-700 to-sky-500 text-white shadow-2xs">
                     <Sparkles size={13} />
                   </div>
                   <span className="font-semibold text-slate-800">
-                    Assistant
+                    ShipFlow AI
                   </span>
                 </div>
                 <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-500 shadow-2xs">
-                  ⌘J
+                  ⌘K
                 </kbd>
               </button>
-            </div>
-          )}
-
-          {/* Vektor Company Setup Readiness Card */}
-          {!compact && (
-            <div className="mt-2.5">
-              <div className="rounded-xl border border-blue-100/90 bg-gradient-to-br from-blue-50/70 to-slate-50 p-3 shadow-2xs">
-                <Link
-                  href="/settings"
-                  onClick={finishNavigation}
-                  className="group flex items-center justify-between text-xs font-bold text-blue-950 hover:text-blue-800"
-                >
-                  <span>Finish Company Setup</span>
-                  <ChevronRight
-                    size={13}
-                    className="text-blue-700 transition-transform group-hover:translate-x-0.5"
-                  />
-                </Link>
-                <div className="mt-1 text-[11px] text-slate-500">
-                  Review ASYCUDA & Dispatch credentials
-                </div>
-                <div className="mt-2.5">
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80">
-                    <div
-                      className="h-full rounded-full bg-blue-700 transition-all"
-                      style={{ width: "75%" }}
-                    />
-                  </div>
-                  <div className="mt-1 flex justify-between text-[10px] font-medium text-slate-400">
-                    <span>6 of 8 completed</span>
-                    <span className="font-semibold text-blue-900">75%</span>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </nav>
@@ -558,7 +676,7 @@ export function WorkspaceSidebar(props: Props) {
                   type="button"
                   aria-label="Account menu"
                   title={props.user.name}
-                  className="flex size-8 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white shadow-2xs hover:opacity-90"
+                  className="flex size-8 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white shadow-2xs hover:opacity-90 transition-opacity"
                 >
                   {userInitials}
                 </button>
@@ -616,7 +734,7 @@ export function WorkspaceSidebar(props: Props) {
                     </span>
                     <span className="block truncate text-[10px] text-slate-400 capitalize">
                       {props.organization?.role || "Member"} ·{" "}
-                      {props.organization?.country_code || "KH"}
+                      {props.organization?.country_code || "SEA"}
                     </span>
                   </span>
                   <ChevronDown size={12} className="shrink-0 text-slate-400" />
@@ -693,12 +811,13 @@ export function WorkspaceSidebar(props: Props) {
         >
           <DialogTitle className="sr-only">Workspace navigation</DialogTitle>
           <DialogDescription className="sr-only">
-            Switch organizations and browse the platform modules.
+            ShipFlow logistics modules, dispatch, fleet, and settings.
           </DialogDescription>
           {content(false, true)}
         </DialogContent>
       </Dialog>
 
+      {/* Quick Search Dialog */}
       <NavigationSearch
         key={searchOpen ? "open" : "closed"}
         open={searchOpen}
@@ -706,6 +825,83 @@ export function WorkspaceSidebar(props: Props) {
         can={props.can}
         onNavigate={finishNavigation}
       />
+
+      {/* My Tasks Sheet Drawer */}
+      <Sheet open={tasksOpen} onOpenChange={setTasksOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col bg-white">
+          <SheetHeader className="p-4 border-b border-slate-100 bg-slate-50">
+            <div className="flex items-center gap-2">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-blue-100 text-blue-900">
+                <ListTodo size={16} />
+              </div>
+              <div>
+                <SheetTitle className="text-sm font-bold text-slate-900">My Operational Tasks</SheetTitle>
+                <SheetDescription className="text-xs text-slate-500">
+                  Priority action items requiring your verification
+                </SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3 space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-blue-950">Review OCR Discrepancies</span>
+                <span className="rounded bg-blue-200/80 px-1.5 py-0.2 text-[9px] font-bold text-blue-900 uppercase">High Priority</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Container weight mismatch detected on B/L RCLY261030704 for shipment SHP-2026-0042.
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/documents/reconciliation"
+                  onClick={() => setTasksOpen(false)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline"
+                >
+                  Open Reconciliation Studio <ArrowUpRight size={12} />
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-amber-950">Approve Transport Order Tenders</span>
+                <span className="rounded bg-amber-200/80 px-1.5 py-0.2 text-[9px] font-bold text-amber-900 uppercase">Medium</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                2 carrier quotes received for route Phnom Penh Logistics Park → Sihanoukville Port.
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/transport/trips"
+                  onClick={() => setTasksOpen(false)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 hover:underline"
+                >
+                  View Dispatch Run-Sheets <ArrowUpRight size={12} />
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-1 shadow-2xs">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-900">Customs SAD Verification</span>
+                <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[9px] font-bold text-slate-600 uppercase">Normal</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Lodge customs declaration with ASYCUDA before vessel estimated time of departure.
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/customs"
+                  onClick={() => setTasksOpen(false)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline"
+                >
+                  Open Customs SAD <ArrowUpRight size={12} />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </Tooltip.Provider>
   );
 }
@@ -731,7 +927,7 @@ function NavLink({
         title={`${item.description}. Planned for a future release.`}
       >
         <item.icon size={14} />
-        <span className="flex-1">{item.label}</span>
+        <span className="flex-1 truncate">{item.label}</span>
         <span className="sidebar-planned">Planned</span>
       </button>
     );
@@ -751,7 +947,12 @@ function NavLink({
       {!compact && (
         <>
           <span className="flex-1 truncate">{item.label}</span>
-          {active ? (
+          {item.badge && (
+            <span className="rounded bg-blue-100 px-1.5 py-0.2 font-mono text-[9px] font-bold text-blue-800">
+              {item.badge}
+            </span>
+          )}
+          {active && !item.badge ? (
             <Pin size={11} className="shrink-0 rotate-45 text-blue-700" />
           ) : (
             <span className="size-1 shrink-0 rounded-full bg-transparent" />
@@ -791,9 +992,7 @@ function ExpandedGroup({
   mobile: boolean;
 }) {
   const active = group.items.some((item) => itemMatchesPath(item, path));
-  const [open, setOpen] = useState(
-    active || group.id === "network" || group.id === "settings",
-  );
+  const [open, setOpen] = useState(active || group.defaultOpen || false);
   const planned = group.items.every((item) => !item.href);
   const id = `${mobile ? "mobile" : "desktop"}-nav-${group.id}`;
 
@@ -806,12 +1005,12 @@ function ExpandedGroup({
         aria-controls={id}
         onClick={() => setOpen((value) => !value)}
       >
-        <group.icon size={17} />
-        <span className="flex-1 text-left">{group.label}</span>
+        <group.icon size={16} />
+        <span className="flex-1 text-left truncate">{group.label}</span>
         {planned && <span className="sidebar-planned">Planned</span>}
         <ChevronRight
           size={13}
-          className={`shrink-0 transition-transform ${
+          className={`shrink-0 transition-transform duration-150 ${
             open ? "rotate-90" : ""
           } ${active ? "text-blue-200" : "text-muted-foreground"}`}
         />
@@ -871,7 +1070,7 @@ function RailGroup({
           sideOffset={12}
           className={menuClass}
         >
-          <DropdownMenu.Label className="px-3 py-2 text-[10px] font-semibold tracking-wide text-muted-foreground">
+          <DropdownMenu.Label className="px-3 py-2 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
             {group.label}
           </DropdownMenu.Label>
           {group.items.map((item) =>

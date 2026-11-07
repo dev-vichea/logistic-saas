@@ -82,6 +82,7 @@ test("create a purchase order from a material request and issue it", async ({ pa
   await secondDrawer.getByRole("button", { name: "Save request" }).click();
   await page.locator(".ag-row").filter({ hasText: secondTitle }).getByRole("link").click();
   await page.getByRole("button", { name: "Submit request" }).click();
+  await expect(page.getByText("Submitted", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close workspace" }).click();
   await expect(page).toHaveURL(/\/material-requests$/);
 

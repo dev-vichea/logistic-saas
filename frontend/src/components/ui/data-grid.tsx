@@ -10,6 +10,7 @@ import {
   type GridReadyEvent,
   type GridApi,
   type SelectionChangedEvent,
+  type RowDoubleClickedEvent,
 } from "ag-grid-community";
 import { AgGridReact, type AgGridReactProps } from "ag-grid-react";
 import {
@@ -76,6 +77,7 @@ export interface MekongDataGridProps<TData = Record<string, unknown>> {
   batchActions?: (selectedRows: TData[], clearSelection: () => void) => React.ReactNode;
   onSelectionChange?: (selectedRows: TData[]) => void;
   onGridReady?: (params: GridReadyEvent<TData>) => void;
+  onRowDoubleClicked?: (event: RowDoubleClickedEvent<TData>) => void;
   gridOptions?: AgGridReactProps<TData>;
 }
 
@@ -96,6 +98,7 @@ export function MekongDataGrid<TData = Record<string, unknown>>({
   batchActions,
   onSelectionChange,
   onGridReady,
+  onRowDoubleClicked,
   gridOptions,
 }: MekongDataGridProps<TData>) {
   const [gridApi, setGridApi] = useState<GridApi<TData> | null>(null);
@@ -420,6 +423,7 @@ export function MekongDataGrid<TData = Record<string, unknown>>({
           ensureDomOrder={true}
           onGridReady={handleGridReady}
           onSelectionChanged={handleSelectionChanged}
+          onRowDoubleClicked={onRowDoubleClicked}
           {...gridOptions}
         />
       </div>

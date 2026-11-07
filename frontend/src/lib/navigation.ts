@@ -1,39 +1,40 @@
 import {
   LayoutDashboard,
-  PackageOpen,
+  ListChecks,
   ClipboardList,
   BadgeDollarSign,
-  CalendarCheck2,
+  Briefcase,
   Package,
-  Truck,
+  CalendarCheck2,
+  Radar,
   Route,
-  UsersRound,
-  Warehouse,
-  PackageCheck,
-  Boxes,
-  Files,
-  FileStack,
+  LayoutGrid,
+  CalendarDays,
   FileText,
-  Globe2,
-  Landmark,
-  ListChecks,
-  Handshake,
-  ContactRound,
-  Network,
-  Wallet,
-  ReceiptText,
-  CreditCard,
-  ChartNoAxesCombined,
-  ChartColumn,
-  Timer,
-  CircleDollarSign,
-  FileSearch,
-  UserRoundCheck,
-  Settings2,
-  Building2,
-  Users,
-  ShieldCheck,
   ScrollText,
+  Map,
+  Truck,
+  UsersRound,
+  Wrench,
+  Landmark,
+  FileStack,
+  ShieldCheck as ShieldCheckIcon,
+  Inbox,
+  ScanSearch,
+  FolderOpen,
+  Receipt,
+  CreditCard,
+  Wallet,
+  Banknote,
+  Building2,
+  ContactRound,
+  Handshake,
+  MapPin,
+  ChartNoAxesCombined,
+  Settings2,
+  Users,
+  Share2,
+  ShoppingCart,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,230 +45,323 @@ export type NavigationItem = {
   href?: string;
   permission?: string;
   description: string;
+  badge?: string;
+  children?: NavigationItem[];
 };
+
 export type NavigationGroup = {
   id: string;
   label: string;
   icon: LucideIcon;
   items: NavigationItem[];
+  defaultOpen?: boolean;
 };
-export const overview: NavigationItem = {
-  id: "overview",
-  label: "Overview",
+
+export type NavigationSection = {
+  id: string;
+  title: string;
+  items?: NavigationItem[];
+  groups?: NavigationGroup[];
+};
+
+// ─── WORKSPACE ──────────────────────────────────────────────────────
+
+export const dashboardNav: NavigationItem = {
+  id: "dashboard",
+  label: "Dashboard",
   icon: LayoutDashboard,
   href: "/dashboard",
-  description: "Your workspace dashboard and recent activity",
+  description: "Operations dashboard, active movements, and KPIs",
 };
-export const materialRequestsNav: NavigationItem = {
-  id: "material-requests",
-  label: "Material Requests",
-  icon: ClipboardList,
-  href: "/material-requests",
-  permission: "material_requests.view",
-  description: "Request materials and track what is needed",
+
+export const myTasksNav: NavigationItem = {
+  id: "my-tasks",
+  label: "My Tasks",
+  icon: ListChecks,
+  description: "Your assigned operational actions and document verifications",
+  badge: "3",
 };
-export const purchaseOrdersNav: NavigationItem = {
-  id: "purchase-orders",
-  label: "Purchase Orders",
-  icon: FileText,
-  href: "/purchase-orders",
-  permission: "purchase_orders.view",
-  description: "Order requested materials from suppliers",
-};
-export const navigationGroups: NavigationGroup[] = [
+
+// ─── COMMERCIAL ─────────────────────────────────────────────────────
+
+export const commercialItems: NavigationItem[] = [
   {
-    id: "freight",
-    label: "Freight Management",
-    icon: PackageOpen,
+    id: "requests",
+    label: "Requests",
+    icon: ClipboardList,
+    href: "/freight/requests",
+    permission: "freight.view",
+    description: "Customer freight requests and cargo quotes",
+  },
+  {
+    id: "quotations",
+    label: "Quotations",
+    icon: BadgeDollarSign,
+    href: "/freight/quotations",
+    permission: "freight.view",
+    description: "Pricing calculations and commercial offers",
+  },
+  {
+    id: "service-jobs",
+    label: "Service Jobs",
+    icon: Briefcase,
+    href: "/freight/bookings",
+    permission: "freight.view",
+    description: "Accepted orders, bookings and operational jobs",
+  },
+];
+
+// ─── OPERATIONS ─────────────────────────────────────────────────────
+
+export const operationsGroups: NavigationGroup[] = [
+  {
+    id: "shipments",
+    label: "Shipments",
+    icon: Package,
+    defaultOpen: true,
     items: [
       {
-        id: "requests",
-        label: "Freight requests",
-        icon: ClipboardList,
-        href: "/freight/requests",
-        permission: "freight.view",
-        description: "Customer cargo and service requests",
-      },
-      {
-        id: "quotations",
-        label: "Quotations",
-        icon: BadgeDollarSign,
-        href: "/freight/quotations",
-        permission: "freight.view",
-        description: "Freight pricing and quotation versions",
-      },
-      {
-        id: "bookings",
-        label: "Orders & bookings",
-        icon: CalendarCheck2,
-        href: "/freight/bookings",
-        permission: "freight.view",
-        description: "Accepted services and commercial commitments",
-      },
-      {
-        id: "shipments",
-        label: "Shipments",
+        id: "all-shipments",
+        label: "All Shipments",
         icon: Package,
         href: "/freight/shipments",
         permission: "freight.view",
-        description: "Cargo movements, parties and milestones",
+        description: "All multimodal freight shipments and status tracker",
+      },
+      {
+        id: "bookings",
+        label: "Bookings",
+        icon: CalendarCheck2,
+        href: "/freight/bookings",
+        permission: "freight.view",
+        description: "Carrier bookings and confirmation numbers",
+      },
+      {
+        id: "tracking",
+        label: "Tracking",
+        icon: Radar,
+        href: "/freight/shipments?view=tracking",
+        permission: "freight.view",
+        description: "Real-time vessel, container and route tracking",
       },
     ],
   },
   {
-    id: "transportation",
-    label: "Transportation",
-    icon: Truck,
+    id: "dispatch",
+    label: "Dispatch",
+    icon: Route,
+    defaultOpen: false,
     items: [
       {
-        id: "trips",
-        label: "Dispatch run-sheets",
-        icon: Route,
-        href: "/transport/trips",
-        permission: "transport.view",
-        description: "Trip planning, route dispatch and digital PODs",
+        id: "dispatch-board",
+        label: "Dispatch Board",
+        icon: LayoutGrid,
+        description: "Interactive fleet schedule and carrier allocation board",
       },
       {
-        id: "fleet",
-        label: "Vehicles & fleet",
+        id: "dispatch-schedule",
+        label: "Schedule",
+        icon: CalendarDays,
+        description: "Pickup and delivery calendar schedule",
+      },
+      {
+        id: "transport-orders",
+        label: "Transport Orders",
+        icon: FileText,
+        description: "Leg assignments and driver haulage instructions",
+      },
+      {
+        id: "tenders",
+        label: "Tenders",
+        icon: ScrollText,
+        description: "Spot market bids and subcontracted carrier tenders",
+      },
+      {
+        id: "manifests",
+        label: "Manifests",
+        icon: ClipboardList,
+        description: "LTL and groupage consolidation manifests",
+      },
+      {
+        id: "trips",
+        label: "Trips",
+        icon: Map,
+        href: "/transport/trips",
+        permission: "transport.view",
+        description: "Active truck runs, waypoint checklists and digital PODs",
+        badge: "Live",
+      },
+    ],
+  },
+  {
+    id: "fleet",
+    label: "Fleet",
+    icon: Truck,
+    defaultOpen: false,
+    items: [
+      {
+        id: "vehicles",
+        label: "Vehicles & Trailers",
         icon: Truck,
         href: "/transport/fleet",
         permission: "transport.view",
-        description: "Trucks, trailers and equipment registry",
+        description: "Prime movers, chassis, containers and trailers",
       },
       {
         id: "drivers",
-        label: "Drivers registry",
+        label: "Drivers",
         icon: UsersRound,
         href: "/transport/drivers",
         permission: "transport.view",
-        description: "Driver roster, licenses and duty status",
+        description: "Driver roster, licenses, phone contacts and shifts",
+      },
+      {
+        id: "maintenance",
+        label: "Maintenance",
+        icon: Wrench,
+        description: "Service intervals, roadworthiness checks and repairs",
       },
     ],
   },
   {
-    id: "warehousing",
-    label: "Warehousing",
-    icon: Warehouse,
+    id: "customs",
+    label: "Customs Clearance",
+    icon: Landmark,
+    defaultOpen: false,
     items: [
       {
-        id: "receiving",
-        label: "Receiving & outbound",
-        icon: PackageCheck,
-        description: "Goods receipts, discrepancies and handover",
-      },
-      {
-        id: "inventory",
-        label: "Inventory",
-        icon: Boxes,
-        description: "Physical stock and movement history",
-      },
-    ],
-  },
-  {
-    id: "trade",
-    label: "Trade & Documents",
-    icon: Files,
-    items: [
-      {
-        id: "documents",
-        label: "Document center",
-        icon: FileStack,
-        href: "/documents",
-        permission: "documents.view",
-        description: "Trade documents vault, extraction and line item review",
-      },
-      {
-        id: "reconciliation",
-        label: "Reconciliation Studio",
-        icon: ListChecks,
-        href: "/documents/reconciliation",
-        permission: "documents.view",
-        description: "Cross-document reconciliation and cargo manifest sync",
-      },
-      {
-        id: "trade-jobs",
-        label: "Import / export",
-        icon: Globe2,
-        description: "International jobs and trade milestones",
-      },
-      {
-        id: "customs",
-        label: "Customs & ASYCUDA",
+        id: "clearance-jobs",
+        label: "Clearance Jobs",
         icon: Landmark,
         href: "/customs",
         permission: "customs.view",
-        description: "ASYCUDA SAD declarations, inspection lanes and clearance status",
+        description: "ASYCUDA SAD entries, inspection lanes and clearance",
       },
       {
-        id: "cdc-quotas",
-        label: "CDC Master Lists & Quota",
-        icon: Files,
+        id: "declarations",
+        label: "Declarations",
+        icon: FileStack,
         href: "/customs/cdc",
         permission: "customs.view",
-        description: "QIP duty-free master lists, item quotas and remaining balances",
+        description: "QIP duty-free CDC Master Lists and quota deductions",
       },
       {
-        id: "cdc-deductions",
-        label: "Quota Deductions Ledger",
-        icon: ListChecks,
-        href: "/customs/deductions",
-        permission: "customs.view",
-        description: "Immutable cut-stock deduction ledger across all shipments",
+        id: "permits",
+        label: "Permits",
+        icon: ShieldCheckIcon,
+        description: "Ministry import/export certificates and border permits",
+      },
+    ],
+  },
+];
+
+// ─── BUSINESS ───────────────────────────────────────────────────────
+
+export const businessGroups: NavigationGroup[] = [
+  {
+    id: "documents",
+    label: "Documents",
+    icon: FolderOpen,
+    defaultOpen: false,
+    items: [
+      {
+        id: "document-inbox",
+        label: "Document Inbox",
+        icon: Inbox,
+        href: "/documents",
+        permission: "documents.view",
+        description: "Incoming shipment files, B/L, invoices & packing lists",
       },
       {
-        id: "cdc",
-        label: "CDC reconciliation",
-        icon: ListChecks,
-        description: "Controlled Master List review and reconciliation",
+        id: "ocr-verification",
+        label: "OCR Verification",
+        icon: ScanSearch,
+        href: "/documents/reconciliation",
+        permission: "documents.view",
+        description: "Document reconciliation studio and extracted data audit",
+      },
+      {
+        id: "document-library",
+        label: "Document Library",
+        icon: FolderOpen,
+        description: "Centralized document vault across all entities",
+      },
+    ],
+  },
+  {
+    id: "billing",
+    label: "Billing",
+    icon: Wallet,
+    defaultOpen: false,
+    items: [
+      {
+        id: "charges",
+        label: "Charges",
+        icon: Receipt,
+        description: "Demurrage, detention, freight tariffs and handling fees",
+      },
+      {
+        id: "customer-invoices",
+        label: "Customer Invoices",
+        icon: CreditCard,
+        description: "Sales invoices and commercial billing",
+      },
+      {
+        id: "vendor-bills",
+        label: "Vendor Bills",
+        icon: Wallet,
+        description: "Carrier freight bills and subcontractor payables",
+      },
+      {
+        id: "payments",
+        label: "Payments",
+        icon: Banknote,
+        description: "Incoming and outgoing wire reconciliations",
       },
     ],
   },
   {
     id: "network",
-    label: "Business Network",
+    label: "Network",
     icon: Handshake,
+    defaultOpen: false,
     items: [
       {
-        id: "partners",
-        label: "Business partners",
+        id: "customers",
+        label: "Customers",
         icon: Building2,
         href: "/partners",
         permission: "partners.view",
-        description: "Your private customer and partner directory",
+        description: "Shippers, consignees and billing accounts",
       },
       {
-        id: "contacts",
-        label: "Contacts & locations",
+        id: "carriers",
+        label: "Carriers",
+        icon: Truck,
+        permission: "partners.view",
+        description: "Shipping lines, airlines, truckers and rail operators",
+      },
+      {
+        id: "brokers",
+        label: "Brokers",
         icon: ContactRound,
+        permission: "partners.view",
+        description: "Licensed customs brokers and forwarding agents",
+      },
+      {
+        id: "partners-directory",
+        label: "Partners",
+        icon: Handshake,
         href: "/network/contacts-locations",
         permission: "partners.view",
-        description: "Find partner contacts, addresses and business sites",
+        description: "All contacts, facilities, warehouses and sites",
       },
       {
-        id: "connections",
-        label: "Partner connections",
-        icon: Network,
-        description: "Verified collaboration with other organizations",
-      },
-    ],
-  },
-  {
-    id: "finance",
-    label: "Finance",
-    icon: Wallet,
-    items: [
-      {
-        id: "charges",
-        label: "Charges & expenses",
-        icon: ReceiptText,
-        description: "Operational revenue, costs and charges",
-      },
-      {
-        id: "invoices",
-        label: "Invoices & payables",
-        icon: CreditCard,
-        description: "Customer invoices, vendor bills and payments",
+        id: "locations",
+        label: "Locations",
+        icon: MapPin,
+        permission: "partners.view",
+        description: "Ports, border gates, container depots and hubs",
       },
     ],
   },
@@ -275,122 +369,235 @@ export const navigationGroups: NavigationGroup[] = [
     id: "reports",
     label: "Reports",
     icon: ChartNoAxesCombined,
+    defaultOpen: false,
     items: [
       {
-        id: "shipment-report",
-        label: "Shipment performance",
-        icon: ChartColumn,
-        description: "Shipment outcomes and service performance",
-      },
-      {
-        id: "transport-report",
-        label: "Transport performance",
-        icon: Timer,
-        description: "On-time delivery and carrier performance",
-      },
-      {
-        id: "financial-report",
-        label: "Financial performance",
-        icon: CircleDollarSign,
-        description: "Revenue, costs and profitability",
-      },
-      {
-        id: "warehouse-report",
-        label: "Warehouse report",
-        icon: Warehouse,
-        description: "Stock movements and discrepancies",
-      },
-      {
-        id: "document-report",
-        label: "Document report",
-        icon: FileSearch,
-        description: "Missing documents and review exceptions",
-      },
-      {
-        id: "customer-report",
-        label: "Customer performance",
-        icon: UserRoundCheck,
-        description: "Customer volumes and service outcomes",
+        id: "reports-overview",
+        label: "Reports",
+        icon: ChartNoAxesCombined,
+        description: "Operational profitability, TEU throughput and OTP metrics",
       },
     ],
   },
+];
+
+// ─── SYSTEM ─────────────────────────────────────────────────────────
+
+export const systemGroups: NavigationGroup[] = [
   {
     id: "settings",
     label: "Settings",
     icon: Settings2,
+    defaultOpen: false,
     items: [
       {
         id: "organizations",
         label: "Organizations",
         icon: Building2,
         href: "/organizations",
-        description: "Create and manage your organization workspaces",
+        description: "Company legal entities, registration TIN and regional hubs",
       },
       {
-        id: "profile",
-        label: "Organization profile",
-        icon: Building2,
-        href: "/settings",
-        permission: "organization.view",
-        description: "Company information and regional preferences",
-      },
-      {
-        id: "team",
-        label: "Team members",
+        id: "team-permissions",
+        label: "Team & Permissions",
         icon: Users,
         href: "/team",
         permission: "team.view",
-        description: "People, invitations and membership roles",
+        description: "User memberships, departments and role permission matrix",
       },
       {
-        id: "departments",
-        label: "Departments",
-        icon: Network,
-        href: "/departments",
-        permission: "departments.view",
-        description: "Your organization's teams and departments",
+        id: "shared-access",
+        label: "Shared Access",
+        icon: Share2,
+        description: "Cross-organization collaboration and record sharing rules",
       },
       {
-        id: "permissions",
-        label: "Roles & permissions",
-        icon: ShieldCheck,
-        href: "/settings/permissions",
-        permission: "organization.view",
-        description: "Understand workspace roles and their permissions",
-      },
-      {
-        id: "activity",
-        label: "Activity log",
+        id: "audit-logs",
+        label: "Audit Logs",
         icon: ScrollText,
         href: "/audit",
         permission: "audit.view",
-        description: "Audited changes to this organization",
+        description: "Immutable security audit log and mutation events",
       },
     ],
   },
 ];
+
+// ─── OPTIONAL PROCUREMENT (PRESERVED) ───────────────────────────────
+
+export const procurementItems: NavigationItem[] = [
+  {
+    id: "material-requests",
+    label: "Material Requests",
+    icon: ClipboardList,
+    href: "/material-requests",
+    permission: "material_requests.view",
+    description: "Internal requisition of factory parts and raw materials",
+  },
+  {
+    id: "purchase-orders",
+    label: "Purchase Orders",
+    icon: ShoppingCart,
+    href: "/purchase-orders",
+    permission: "purchase_orders.view",
+    description: "Factory supplier purchase orders and line items",
+  },
+];
+
+// ─── AGGREGATE GROUPS (FOR SEARCH & BACKWARDS COMPATIBILITY) ────────
+
+export const navigationGroups: NavigationGroup[] = [
+  {
+    id: "commercial",
+    label: "Commercial",
+    icon: BadgeDollarSign,
+    items: commercialItems,
+  },
+  ...operationsGroups,
+  ...businessGroups,
+  ...systemGroups,
+];
+
+// ─── COMPREHENSIVE SECTIONS ─────────────────────────────────────────
+
+export const navigationSections: NavigationSection[] = [
+  {
+    id: "workspace",
+    title: "WORKSPACE",
+    items: [dashboardNav, myTasksNav],
+  },
+  {
+    id: "commercial",
+    title: "COMMERCIAL",
+    items: commercialItems,
+  },
+  {
+    id: "operations",
+    title: "OPERATIONS",
+    groups: operationsGroups,
+  },
+  {
+    id: "business",
+    title: "BUSINESS",
+    groups: businessGroups,
+  },
+  {
+    id: "system",
+    title: "SYSTEM",
+    groups: systemGroups,
+  },
+];
+
+// ─── BACKWARDS COMPATIBILITY EXPORTS ────────────────────────────────
+
+export const overview = dashboardNav;
+export const materialRequestsNav = procurementItems[0];
+export const purchaseOrdersNav = procurementItems[1];
+
+// ─── ROUTE MATCHING HELPER ──────────────────────────────────────────
+
 export function itemMatchesPath(item: NavigationItem, path: string): boolean {
   if (!item.href) return false;
-  if (item.id === "material-requests")
-    return path === "/material-requests" || path.startsWith("/material-requests/");
-  if (item.id === "purchase-orders")
-    return path === "/purchase-orders" || path.startsWith("/purchase-orders/");
-  if (item.id === "partners")
-    return path === "/partners" || path.startsWith("/partners/");
-  if (item.id === "organizations")
-    return path === "/organizations" || path.startsWith("/organizations/");
+  if (item.id === "dashboard") {
+    return path === "/dashboard";
+  }
+  if (item.id === "all-shipments") {
+    return path.startsWith("/freight/shipments");
+  }
+  if (item.id === "bookings" || item.id === "service-jobs") {
+    return path.startsWith("/freight/bookings");
+  }
+  if (item.id === "requests") {
+    return path.startsWith("/freight/requests");
+  }
+  if (item.id === "quotations") {
+    return path.startsWith("/freight/quotations");
+  }
+  if (item.id === "trips") {
+    return path.startsWith("/transport/trips");
+  }
+  if (item.id === "vehicles") {
+    return path.startsWith("/transport/fleet");
+  }
+  if (item.id === "drivers") {
+    return path.startsWith("/transport/drivers");
+  }
+  if (item.id === "clearance-jobs") {
+    return path === "/customs" || path.startsWith("/customs/");
+  }
+  if (item.id === "declarations") {
+    return path.startsWith("/customs/cdc");
+  }
+  if (item.id === "document-inbox") {
+    return path === "/documents" || (path.startsWith("/documents/") && !path.includes("/reconciliation"));
+  }
+  if (item.id === "ocr-verification") {
+    return path.startsWith("/documents/reconciliation");
+  }
+  if (item.id === "customers") {
+    return path.startsWith("/partners");
+  }
+  if (item.id === "partners-directory") {
+    return path.startsWith("/network/contacts-locations");
+  }
+  if (item.id === "organizations") {
+    return path.startsWith("/organizations");
+  }
+  if (item.id === "team-permissions") {
+    return path.startsWith("/team");
+  }
+  if (item.id === "audit-logs") {
+    return path.startsWith("/audit");
+  }
+  if (item.id === "material-requests") {
+    return path.startsWith("/material-requests");
+  }
+  if (item.id === "purchase-orders") {
+    return path.startsWith("/purchase-orders");
+  }
   return path === item.href;
 }
-export function navigationLocation(path: string) {
-  if (itemMatchesPath(overview, path))
-    return { group: "Workspace", label: overview.label };
-  if (itemMatchesPath(materialRequestsNav, path))
-    return { group: "Workspace", label: materialRequestsNav.label };
-  if (itemMatchesPath(purchaseOrdersNav, path))
-    return { group: "Workspace", label: purchaseOrdersNav.label };
-  for (const group of navigationGroups) {
-    const item = group.items.find((item) => itemMatchesPath(item, path));
-    if (item) return { group: group.label, label: item.label };
+
+export function navigationLocation(path: string): { group: string; label: string } {
+  if (itemMatchesPath(dashboardNav, path)) {
+    return { group: "Workspace", label: dashboardNav.label };
   }
+  if (itemMatchesPath(procurementItems[0], path)) {
+    return { group: "Procurement", label: procurementItems[0].label };
+  }
+  if (itemMatchesPath(procurementItems[1], path)) {
+    return { group: "Procurement", label: procurementItems[1].label };
+  }
+
+  for (const item of commercialItems) {
+    if (itemMatchesPath(item, path)) {
+      return { group: "Commercial", label: item.label };
+    }
+  }
+
+  for (const group of operationsGroups) {
+    for (const item of group.items) {
+      if (itemMatchesPath(item, path)) {
+        return { group: group.label, label: item.label };
+      }
+    }
+  }
+
+  for (const group of businessGroups) {
+    for (const item of group.items) {
+      if (itemMatchesPath(item, path)) {
+        return { group: group.label, label: item.label };
+      }
+    }
+  }
+
+  for (const group of systemGroups) {
+    for (const item of group.items) {
+      if (itemMatchesPath(item, path)) {
+        return { group: group.label, label: item.label };
+      }
+    }
+  }
+
   return { group: "Workspace", label: "Workspace" };
 }

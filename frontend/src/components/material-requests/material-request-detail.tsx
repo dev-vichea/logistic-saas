@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Send } from "lucide-react";
+import { Send, X } from "lucide-react";
 import { useWorkspace } from "@/components/workspace";
 import { ErrorBox, Loading, NoOrganization, formatDate } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RecordField, RecordPanel, RecordProgress } from "@/components/record-workspace/record-sections";
-import { openWorkspaceRecord, RecordWorkspace, RelatedRecordButton } from "@/components/record-workspace/record-workspace";
+import { openWorkspaceRecord, RecordDrawerShell, RecordWorkspace, RelatedRecordButton } from "@/components/record-workspace/record-workspace";
 import { api, errorMessage } from "@/lib/api";
 import { materialRequestsRoot, type MaterialRequest } from "@/lib/material-requests";
 import { useResource } from "@/lib/use-resource";
@@ -45,8 +45,38 @@ function ScopedMaterialRequestDetail({ id, organizationId }: { id: string; organ
     }
   }
 
-  if (resource.error) return <ErrorBox message={resource.error} />;
-  if (!resource.data || !organization) return <Loading />;
+  if (resource.error) {
+    return (
+      <RecordDrawerShell onClose={() => router.push("/material-requests")} ariaLabel="Material request error">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2">
+          <span className="text-xs font-semibold text-slate-500">Material Request</span>
+          <Button variant="ghost" size="sm" onClick={() => router.push("/material-requests")} className="gap-1.5 text-slate-600 hover:text-slate-900" aria-label="Close workspace">
+            <X size={16} />
+            <span>Close workspace</span>
+          </Button>
+        </div>
+        <div className="p-6">
+          <ErrorBox message={resource.error} />
+        </div>
+      </RecordDrawerShell>
+    );
+  }
+  if (!resource.data || !organization) {
+    return (
+      <RecordDrawerShell onClose={() => router.push("/material-requests")} ariaLabel="Loading material request">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2">
+          <span className="text-xs font-semibold text-slate-500">Loading request...</span>
+          <Button variant="ghost" size="sm" onClick={() => router.push("/material-requests")} className="gap-1.5 text-slate-600 hover:text-slate-900" aria-label="Close workspace">
+            <X size={16} />
+            <span>Close workspace</span>
+          </Button>
+        </div>
+        <div className="flex flex-1 items-center justify-center p-8">
+          <Loading />
+        </div>
+      </RecordDrawerShell>
+    );
+  }
   const request = resource.data.data;
   const editable = request.status === "draft" && can("material_requests.manage");
   const relatedOrder = request.purchase_order ? {

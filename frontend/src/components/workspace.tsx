@@ -291,7 +291,7 @@ function WorkspaceInner({
           </div>
           {!isFullWidth && !config?.hideFooter && (
             <footer className="mt-12 flex items-center justify-between border-t pt-5 text-[10px] text-muted-foreground">
-              <span>Mekong · Logistics, connected.</span>
+              <span>ShipFlow · Transportation & Logistics Management Platform</span>
               <span className="flex items-center gap-1">
                 Platform foundation <ArrowUpRight size={12} />
               </span>

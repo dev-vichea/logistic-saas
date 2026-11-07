@@ -164,7 +164,7 @@ export function NewDeclarationDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" size="2xl" className="p-0">
+      <SheetContent side="right" size="4/5" className="p-0">
         <form onSubmit={handleSubmit} className="flex h-full flex-col">
           <SheetHeader>
             <div className="flex items-center gap-2">
