@@ -16,7 +16,13 @@ import {
 } from "lucide-react";
 import { useWorkspace } from "@/components/workspace";
 import { api, errorMessage } from "@/lib/api";
-import { NoOrganization, Loading, ErrorBox, Empty } from "@/components/common";
+import {
+  NoOrganization,
+  Loading,
+  ErrorBox,
+  Empty,
+  Pagination,
+} from "@/components/common";
 import { useResource } from "@/lib/use-resource";
 import {
   documentsRoot,
@@ -29,6 +35,7 @@ import { type Paginated } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MekongDataGrid } from "@/components/ui/data-grid";
+import { Input } from "@/components/ui/input";
 import { UploadDocumentDialog } from "./upload-document-dialog";
 import {
   WorkspaceHeaderSlot,
@@ -39,25 +46,30 @@ import {
   ViewSettingsButton,
 } from "@/components/navigation/header-context";
 
-export function DocumentVault() {
+export function DocumentVault({ verifiedOnly = false }: { verifiedOnly?: boolean }) {
   const { organization, can } = useWorkspace();
+  const allowed = can("documents.view");
   const [search, setSearch] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
   const [activeView, setActiveView] = useState<string>("default");
+  const [page, setPage] = useState(1);
 
   const catalogRes = useResource<{ data: DocumentCatalog }>(
-    organization ? `${documentsRoot(organization.id)}/catalog` : null
+    organization && allowed ? `${documentsRoot(organization.id)}/catalog` : null
   );
 
   const queryParams = new URLSearchParams();
   if (search.trim()) queryParams.set("search", search.trim());
   if (typeFilter && typeFilter !== "all") queryParams.set("document_type", typeFilter);
-  if (statusFilter && statusFilter !== "all") queryParams.set("status", statusFilter);
+  if (verifiedOnly) {
+    queryParams.set("status", "verified");
+    queryParams.set("page", String(page));
+  } else if (statusFilter !== "all") queryParams.set("status", statusFilter);
 
   const documentsRes = useResource<Paginated<TradeDocument>>(
-    organization ? `${documentsRoot(organization.id)}?${queryParams.toString()}` : null
+    organization && allowed ? `${documentsRoot(organization.id)}?${queryParams.toString()}` : null
   );
 
   const rawCatalog = catalogRes.data as { data?: DocumentCatalog } | DocumentCatalog | undefined;
@@ -95,10 +107,16 @@ export function DocumentVault() {
     search.trim() !== "";
 
   const resetAllFilters = () => {
+    setPage(1);
     setTypeFilter("all");
     setStatusFilter("all");
     setDateFilter("all");
     setSearch("");
+  };
+
+  const updateSearch = (value: string) => {
+    setPage(1);
+    setSearch(value);
   };
 
   const documents = useMemo(() => {
@@ -183,17 +201,28 @@ export function DocumentVault() {
       {
         headerName: "Document File",
         field: "document_number",
-        width: 175,
+        width: verifiedOnly ? 220 : 175,
         pinned: "left",
         cellRenderer: (params: CustomCellRendererProps<TradeDocument>) => {
           const doc = params.data;
           if (!doc) return null;
+          const reference = doc.document_number || doc.file_name;
           return (
             <div className="flex items-center gap-1.5 h-full">
               <FileText className="size-3.5 text-blue-900 shrink-0" />
-              <span className="font-semibold text-slate-900 text-xs truncate">
-                {doc.document_number || "Doc #" + doc.id}
-              </span>
+              {verifiedOnly ? (
+                <Link
+                  href={`/documents/${doc.id}`}
+                  title={reference}
+                  className="truncate text-sm font-semibold text-accent-foreground underline-offset-4 hover:underline"
+                >
+                  {reference}
+                </Link>
+              ) : (
+                <span className="font-semibold text-slate-900 text-xs truncate">
+                  {doc.document_number || "Doc #" + doc.id}
+                </span>
+              )}
             </div>
           );
         },
@@ -335,6 +364,11 @@ export function DocumentVault() {
       },
     ];
 
+    if (verifiedOnly) {
+      return allCols.filter(
+        (col) => col.headerName !== "AI Parsing & Quality" && col.headerName !== "Actions",
+      );
+    }
     if (activeView === "reconciliation") {
       return allCols.filter((col) => {
         const name = "headerName" in col ? col.headerName : "";
@@ -348,21 +382,23 @@ export function DocumentVault() {
       });
     }
     return allCols;
-  }, [activeView, can, handleDelete]);
+  }, [activeView, can, handleDelete, verifiedOnly]);
 
   if (!organization) return <NoOrganization />;
+  if (!allowed)
+    return <ErrorBox message="You do not have access to trade documents." />;
   if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
-  if (documentsRes.error) return <ErrorBox message={documentsRes.error} />;
   if (!catalogRes.data) return <Loading />;
 
   return (
     <div className="flex-1 min-h-0 w-full h-full flex flex-col overflow-hidden">
+      {verifiedOnly && <h1 className="sr-only">Document Library</h1>}
       {/* Vektor TMS Flexible Header & Sub-Header Toolbar */}
       <WorkspaceHeaderSlot
         fullWidth={true}
-        title="Document Vault"
+        title={verifiedOnly ? "Document Library" : "Document Vault"}
         icon={FileText}
-        tabs={[
+        tabs={verifiedOnly ? undefined : [
           { id: "all", label: "All Documents", count: stats.total_documents },
           { id: "reconciled", label: "Reconciled", count: stats.reconciled },
           { id: "flagged", label: "Discrepancies", count: stats.flagged || undefined },
@@ -371,9 +407,13 @@ export function DocumentVault() {
         activeTab={statusFilter}
         onTabChange={setStatusFilter}
         searchValue={search}
-        onSearchChange={setSearch}
+        onSearchChange={verifiedOnly ? undefined : updateSearch}
         searchPlaceholder="Search document number, file name, shipment..."
-        primaryAction={
+        primaryAction={verifiedOnly ? (
+          <Button asChild variant="outline">
+            <Link href="/documents" aria-label="Document inbox">Inbox</Link>
+          </Button>
+        ) : (
           <div className="flex items-center gap-2">
             <Link href="/documents/reconciliation">
               <Button variant="outline" className="gap-1.5 h-9 text-xs">
@@ -391,58 +431,76 @@ export function DocumentVault() {
               />
             )}
           </div>
-        }
+        )}
         subHeader={
           <>
-            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-              <FloatingFilterSelect
-                label="Status"
-                value={statusFilter}
-                allLabel="All Statuses"
-                options={[
-                  { value: "parsed", label: "AI Parsed" },
-                  { value: "reconciled", label: "Reconciled" },
-                  { value: "flagged", label: "Flagged Discrepancies" },
-                  { value: "verified", label: "Verified" },
-                ]}
-                onChange={setStatusFilter}
-                minWidth="min-w-[125px]"
-              />
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              {verifiedOnly ? (
+                <Input
+                  type="search"
+                  aria-label="Search document number or file name"
+                  placeholder="Search documents…"
+                  value={search}
+                  onChange={(event) => updateSearch(event.target.value)}
+                  className="h-9 w-full placeholder:text-muted-foreground sm:w-52"
+                />
+              ) : (
+                <FloatingFilterSelect
+                  label="Status"
+                  value={statusFilter}
+                  allLabel="All Statuses"
+                  options={[
+                    { value: "parsed", label: "AI Parsed" },
+                    { value: "reconciled", label: "Reconciled" },
+                    { value: "flagged", label: "Flagged Discrepancies" },
+                    { value: "verified", label: "Verified" },
+                  ]}
+                  onChange={setStatusFilter}
+                  minWidth="min-w-[125px]"
+                />
+              )}
               <FloatingFilterSelect
                 label="Doc Type"
                 value={typeFilter}
                 allLabel="All Types"
                 options={catalog.document_types || []}
-                onChange={setTypeFilter}
+                onChange={(value) => {
+                  setPage(1);
+                  setTypeFilter(value);
+                }}
                 minWidth="min-w-[130px]"
               />
-              <FloatingDateFilter
-                label="Uploaded"
-                value={dateFilter}
-                onChange={setDateFilter}
-              />
+              {!verifiedOnly && (
+                <FloatingDateFilter
+                  label="Uploaded"
+                  value={dateFilter}
+                  onChange={setDateFilter}
+                />
+              )}
               {hasActiveFilters && (
                 <FilterResetButton onReset={resetAllFilters} />
               )}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <ViewPresetSelector
-                activeView={activeView}
-                presets={[
-                  { id: "default", label: "Default View", desc: "All files, shipments & AI parsing" },
-                  { id: "reconciliation", label: "Reconciliation & Audit", desc: "Status & AI confidence" },
-                  { id: "classification", label: "Classification", desc: "Document types & shipments" },
-                ]}
-                onSelectView={setActiveView}
-              />
-              <ViewSettingsButton onClick={resetAllFilters} />
-            </div>
+            {!verifiedOnly && (
+              <div className="flex items-center gap-2 shrink-0">
+                <ViewPresetSelector
+                  activeView={activeView}
+                  presets={[
+                    { id: "default", label: "Default View", desc: "All files, shipments & AI parsing" },
+                    { id: "reconciliation", label: "Reconciliation & Audit", desc: "Status & AI confidence" },
+                    { id: "classification", label: "Classification", desc: "Document types & shipments" },
+                  ]}
+                  onSelectView={setActiveView}
+                />
+                <ViewSettingsButton onClick={resetAllFilters} />
+              </div>
+            )}
           </>
         }
       />
 
       {/* KPI Overview Cards */}
-      <div className="px-4 py-2.5 grid grid-cols-2 md:grid-cols-4 gap-2.5 shrink-0 bg-slate-50/50 border-b border-slate-200/60">
+      {!verifiedOnly && <div className="px-4 py-2.5 grid grid-cols-2 md:grid-cols-4 gap-2.5 shrink-0 bg-slate-50/50 border-b border-slate-200/60">
         <div className="rounded-lg border border-slate-200/90 bg-white p-2.5 shadow-2xs">
           <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total Documents</div>
           <div className="text-xl font-bold text-slate-900 mt-0.5">{stats.total_documents}</div>
@@ -466,22 +524,28 @@ export function DocumentVault() {
           <div className="text-xl font-bold text-purple-700 mt-0.5">{stats.verified}</div>
           <div className="text-[10px] text-slate-400">Audited for customs lodging</div>
         </div>
-      </div>
+      </div>}
 
       {/* Main Content: Full-Bleed AG Grid Table */}
-      {!documentsRes.data && !documentsRes.error ? (
+      {documentsRes.error ? (
+        <div className="p-6">
+          <ErrorBox message={documentsRes.error} />
+        </div>
+      ) : !documentsRes.data ? (
         <Loading />
       ) : documents.length === 0 ? (
         <div className="p-6">
           <Empty
-            title="No documents in vault"
+            title={verifiedOnly ? "No verified documents" : "No documents in vault"}
             description={
               search || hasActiveFilters
                 ? "No trade documents match your active search or filter selection."
-                : "Upload commercial invoices, packing lists, and bills of lading to extract line items with OCR."
+                : verifiedOnly
+                  ? "Verified documents appear here. Open the inbox to review documents that still need verification."
+                  : "Upload commercial invoices, packing lists, and bills of lading to extract line items with OCR."
             }
             action={
-              can("documents.upload") ? (
+              !verifiedOnly && can("documents.upload") ? (
                 <UploadDocumentDialog
                   catalog={catalog}
                   onUploaded={() => {
@@ -498,8 +562,22 @@ export function DocumentVault() {
           <MekongDataGrid<TradeDocument>
             rowData={documents}
             columnDefs={columnDefs}
+            title={verifiedOnly ? "Verified documents" : undefined}
             fullScreen={true}
             quickFilterPlaceholder="Quick search in documents..."
+            enableQuickFilter={!verifiedOnly}
+            enableSelection={!verifiedOnly}
+            showRowNumbers={!verifiedOnly}
+            gridOptions={verifiedOnly ? { pagination: false } : undefined}
+          />
+        </div>
+      )}
+      {verifiedOnly && documentsRes.data && documentsRes.data.last_page > 1 && (
+        <div className="shrink-0 border-t px-4 pb-4">
+          <Pagination
+            page={documentsRes.data.current_page}
+            last={documentsRes.data.last_page}
+            onChange={setPage}
           />
         </div>
       )}

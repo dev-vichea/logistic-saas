@@ -188,7 +188,7 @@ class CustomsService
                 $shipment->milestones()->create([
                     'organization_id' => $context->organization->id,
                     'code' => 'CUSTOMS_RELEASED',
-                    'title' => 'Port / Customs Gate Released',
+                    'title' => 'Customs Release Recorded',
                     'description' => "Cargo released under declaration {$declaration->declaration_number}.",
                     'occurred_at' => now(),
                     'created_by_user_id' => $context->membership->user_id,

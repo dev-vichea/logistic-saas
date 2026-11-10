@@ -9,7 +9,10 @@ use App\Modules\Organizations\OrganizationContext;
 
 final class FreightActions
 {
-    public function __construct(private OrganizationActions $organizations) {}
+    public function __construct(
+        private OrganizationActions $organizations,
+        private ShipmentPickup $pickup,
+    ) {}
 
     // ------------------------------------------------------------------------
     // Freight Requests
@@ -231,6 +234,11 @@ final class FreightActions
         return $this->organizations->mutate($context, 'freight.manage', function (Organization $organization) use ($shipmentId, $data) {
             $shipment = $organization->shipments()->lockForUpdate()->findOrFail($shipmentId);
 
+            $existing = $this->pickup->prepareMilestone($shipment, $data);
+            if ($existing !== null) {
+                return $existing;
+            }
+
             $data['organization_id'] = $organization->id;
             $data['created_by_user_id'] = auth()->id();
             $data['occurred_at'] = $data['occurred_at'] ?? now();
@@ -259,6 +267,7 @@ final class FreightActions
                 'shipment_id' => $shipmentId,
                 'milestone_id' => $milestone->id,
                 'code' => $milestone->code,
+                ...($milestone->container_number === null ? [] : ['container_number' => $milestone->container_number]),
             ]);
 
             return $milestone;

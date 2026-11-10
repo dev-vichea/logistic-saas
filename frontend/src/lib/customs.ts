@@ -225,7 +225,7 @@ export function declarationStatusInfo(status?: CustomsDeclarationStatus | string
     case "cleared":
       return { label: "Customs Cleared", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" };
     case "released":
-      return { label: "Gate Released", badge: "bg-teal-50 text-teal-700 border-teal-200" };
+      return { label: "Customs Release Recorded", badge: "bg-teal-50 text-teal-700 border-teal-200" };
     case "rejected":
       return { label: "Rejected", badge: "bg-rose-50 text-rose-700 border-rose-200" };
     default:

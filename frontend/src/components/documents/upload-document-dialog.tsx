@@ -142,8 +142,8 @@ H.S.Code,Description,English,Quantity,Unit,Packages,Gross Weight,Net Weight,Volu
             )}
 
             {/* Quick Sample Presets */}
-            <div className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50/60 to-indigo-50/40 p-3.5 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-600 font-bold uppercase tracking-wider">Quick load sample:</span>
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/50 p-3.5">
+              <span className="text-sm font-medium text-muted-foreground">Quick load sample:</span>
               <Button
                 type="button"
                 variant="outline"

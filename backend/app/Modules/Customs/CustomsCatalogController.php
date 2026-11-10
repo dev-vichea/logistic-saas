@@ -50,7 +50,7 @@ class CustomsCatalogController extends Controller
                     ['value' => 'lodged', 'label' => 'Lodged in ASYCUDA World'],
                     ['value' => 'under_inspection', 'label' => 'Under Customs Inspection'],
                     ['value' => 'cleared', 'label' => 'Customs Cleared & Tax Exempted'],
-                    ['value' => 'released', 'label' => 'Gate Release Order Issued'],
+                    ['value' => 'released', 'label' => 'Customs Release Recorded'],
                     ['value' => 'rejected', 'label' => 'Rejected / Disputed by Customs'],
                 ],
                 'cdc_master_lists' => $org->cdcMasterLists()->with('items')->get(),

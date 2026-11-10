@@ -1,11 +1,15 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
-test("open Vektor-style create shipment workspace, test document extraction and draft workflow", async ({ page }) => {
+async function login(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Work email").fill(process.env.E2E_EMAIL || "dara@mekong.test");
   await page.getByLabel("Password", { exact: true }).fill(process.env.E2E_PASSWORD || "MekongDemo2026!");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
+}
+
+test("open Vektor-style create shipment workspace, test document extraction and draft workflow", async ({ page }) => {
+  await login(page);
 
   // Navigate to Shipments
   const sidebar = page.getByRole("complementary", { name: "Workspace sidebar" });
@@ -75,4 +79,65 @@ test("open Vektor-style create shipment workspace, test document extraction and 
 
   // Verify workspace closes and returns to shipments or shipment detail
   await expect(workspace).toBeHidden({ timeout: 15000 });
+});
+
+test("track destination pickup for one container without releasing the rest", async ({ page }) => {
+  await login(page);
+  const shipmentId = await page.evaluate(async () => {
+    const headers = { Accept: "application/json" };
+    const me = await fetch("/api/v1/me", { headers });
+    const { data: { organization_id: organizationId } } = await me.json();
+    const shipmentsUrl = `/api/v1/organizations/${organizationId}/freight/shipments`;
+    const list = await fetch(shipmentsUrl, { headers });
+    const { data: [sample] } = await list.json();
+    if (!sample) throw new Error("Seed the development fixtures before running shipment browser tests.");
+
+    const csrf = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/)?.[1];
+    const response = await fetch(shipmentsUrl, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        "X-XSRF-TOKEN": decodeURIComponent(csrf ?? ""),
+      },
+      body: JSON.stringify({
+        customer_id: sample.customer_id,
+        origin_location_id: sample.origin_location_id,
+        destination_location_id: sample.destination_location_id,
+        transport_mode: "ocean_fcl",
+        customs_status: "cleared",
+        cargo_items: [
+          { description: "First container cargo", quantity: 1, container_number: "MSCU1234567" },
+          { description: "Second container cargo", quantity: 1, container_number: "MSCU7654321" },
+        ],
+      }),
+    });
+    if (!response.ok) throw new Error(`Could not create pickup fixture (${response.status}).`);
+    return (await response.json()).data.id as number;
+  });
+
+  await page.goto(`/freight/shipments/${shipmentId}`);
+  await expect(page.getByRole("heading", { name: "Destination pickup" })).toBeVisible();
+  await expect(page.getByText("0 of 2 ready for pickup · 0 collected")).toBeVisible();
+  const first = page.getByRole("region", { name: "Container MSCU1234567" });
+  const second = page.getByRole("region", { name: "Container MSCU7654321" });
+
+  for (const action of ["Confirm carrier release", "Confirm terminal pickup", "Record gate-out"]) {
+    await first.getByRole("button", { name: action }).click();
+    const drawer = page.getByRole("dialog", { name: action });
+    await expect(drawer.getByText("Record this event for container MSCU1234567.")).toBeVisible();
+    await drawer.getByRole("button", { name: "Save Milestone" }).click();
+    await expect(drawer).toBeHidden();
+    if (action === "Confirm terminal pickup") {
+      await expect(page.getByText("1 of 2 ready for pickup · 0 collected")).toBeVisible();
+    }
+  }
+
+  await expect(page.getByText("0 of 2 ready for pickup · 1 collected")).toBeVisible();
+  await expect(first.getByText("Collected", { exact: true })).toBeVisible();
+  await expect(second.getByText("Waiting for carrier release")).toBeVisible();
+  await expect(second.getByRole("button", { name: "Record gate-out" })).toHaveCount(0);
+  await page.reload();
+  await expect(first.getByText("Collected", { exact: true })).toBeVisible();
+  await expect(page.getByText("Container gated out", { exact: true })).toBeVisible();
 });

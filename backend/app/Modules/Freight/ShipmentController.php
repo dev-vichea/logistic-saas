@@ -52,7 +52,7 @@ class ShipmentController
         return $query->orderBy('id', 'desc')->paginate($request->integer('per_page', 20))->withQueryString();
     }
 
-    public function show(Request $request, int $organization, int $shipment): array
+    public function show(Request $request, int $organization, int $shipment, ShipmentPickup $pickup): array
     {
         $context = OrganizationContext::from($request);
         $context->authorize('freight.view');
@@ -70,6 +70,11 @@ class ShipmentController
                 'milestones' => fn ($q) => $q->with(['location', 'createdByUser'])->orderBy('occurred_at', 'desc'),
             ])
             ->findOrFail($shipment);
+
+        $item->setAttribute('destination_pickup', $pickup->summarize(
+            $item,
+            in_array('documents.view', $context->membership->role->permissions(), true),
+        ));
 
         return ['data' => $item];
     }

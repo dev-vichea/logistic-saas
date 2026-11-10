@@ -23,6 +23,7 @@ Route::prefix('transport')->group(function () {
     Route::patch('drivers/{driver}', [DriverController::class, 'update'])->whereNumber('driver');
 
     // Dispatch Trips & Run-Sheets
+    Route::get('schedule', [DispatchTripController::class, 'schedule']);
     Route::get('trips', [DispatchTripController::class, 'index']);
     Route::post('trips', [DispatchTripController::class, 'store']);
     Route::get('trips/{trip}', [DispatchTripController::class, 'show'])->whereNumber('trip');

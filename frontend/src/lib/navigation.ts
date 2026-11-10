@@ -156,19 +156,25 @@ export const operationsGroups: NavigationGroup[] = [
         id: "dispatch-board",
         label: "Dispatch Board",
         icon: LayoutGrid,
-        description: "Interactive fleet schedule and carrier allocation board",
+        href: "/transport/dispatch-board",
+        permission: "transport.view",
+        description: "Draft, active, and completed trips by dispatch stage",
       },
       {
         id: "dispatch-schedule",
         label: "Schedule",
         icon: CalendarDays,
-        description: "Pickup and delivery calendar schedule",
+        href: "/transport/schedule",
+        permission: "transport.view",
+        description: "Scheduled pickups and deliveries by trip",
       },
       {
         id: "transport-orders",
         label: "Transport Orders",
         icon: FileText,
-        description: "Leg assignments and driver haulage instructions",
+        href: "/transport/orders",
+        permission: "transport.view",
+        description: "Shipment legs assigned to dispatch run sheets",
       },
       {
         id: "tenders",
@@ -180,7 +186,9 @@ export const operationsGroups: NavigationGroup[] = [
         id: "manifests",
         label: "Manifests",
         icon: ClipboardList,
-        description: "LTL and groupage consolidation manifests",
+        href: "/transport/manifests",
+        permission: "transport.view",
+        description: "Cargo recorded on shipments attached to a dispatch run",
       },
       {
         id: "trips",
@@ -284,7 +292,9 @@ export const businessGroups: NavigationGroup[] = [
         id: "document-library",
         label: "Document Library",
         icon: FolderOpen,
-        description: "Centralized document vault across all entities",
+        href: "/documents/library",
+        permission: "documents.view",
+        description: "Verified trade documents for this organization",
       },
     ],
   },
@@ -338,6 +348,7 @@ export const businessGroups: NavigationGroup[] = [
         id: "carriers",
         label: "Carriers",
         icon: Truck,
+        href: "/network/carriers",
         permission: "partners.view",
         description: "Shipping lines, airlines, truckers and rail operators",
       },
@@ -345,6 +356,7 @@ export const businessGroups: NavigationGroup[] = [
         id: "brokers",
         label: "Brokers",
         icon: ContactRound,
+        href: "/network/brokers",
         permission: "partners.view",
         description: "Licensed customs brokers and forwarding agents",
       },
@@ -516,6 +528,9 @@ export function itemMatchesPath(item: NavigationItem, path: string): boolean {
   if (item.id === "trips") {
     return path.startsWith("/transport/trips");
   }
+  if (item.id === "manifests") {
+    return path === item.href || path.startsWith("/transport/manifests/");
+  }
   if (item.id === "vehicles") {
     return path.startsWith("/transport/fleet");
   }
@@ -529,7 +544,7 @@ export function itemMatchesPath(item: NavigationItem, path: string): boolean {
     return path.startsWith("/customs/cdc");
   }
   if (item.id === "document-inbox") {
-    return path === "/documents" || (path.startsWith("/documents/") && !path.includes("/reconciliation"));
+    return path === "/documents" || /^\/documents\/\d+$/.test(path);
   }
   if (item.id === "ocr-verification") {
     return path.startsWith("/documents/reconciliation");

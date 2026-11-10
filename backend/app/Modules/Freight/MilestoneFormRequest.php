@@ -18,6 +18,7 @@ class MilestoneFormRequest extends FormRequest
     {
         return [
             'code' => ['required', 'string', 'max:50'],
+            'container_number' => ['sometimes', 'nullable', 'string', 'max:50'],
             'title' => ['required', 'string', 'max:160'],
             'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'location_name' => ['sometimes', 'nullable', 'string', 'max:160'],

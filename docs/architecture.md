@@ -59,4 +59,4 @@ Future collaboration must introduce explicit consent and scoped relationship rec
 
 Add a module directory, its migrations, actions, requests and versioned routes. Reuse `ResolveOrganization` and pass `OrganizationContext` into tenant operations. Fetch resources through scoped relationships, add database tenant constraints, extend the role permission catalog, and record changes in the same transaction. Add tests that try another tenant’s IDs before exposing new UI. Queued jobs must carry explicit organization/resource IDs and resolve scope again; never depend on an HTTP session or a retained global tenant.
 
-Shipment, transport, driver, warehouse, customs, document AI and finance are extension points only. The sidebar shows the target platform structure with future modules clearly marked Planned and disabled. No future operational tables, fake workflows or placeholder business data are implemented.
+Freight, transportation, trade documents and customs have working routes. The [planned page map](planned-pages.md) shows how these modules connect, which pages can reuse their records, and which sidebar entries still need a domain model or API.

@@ -97,9 +97,15 @@ test("complete ShipFlow logistics navigation, groups, search and compact rail", 
   await expect(
     sidebar.getByRole("link", { name: "Trips", exact: true }),
   ).toBeVisible();
-  await expect(
-    sidebar.getByRole("button", { name: /^Dispatch Board/ }),
-  ).toBeDisabled();
+  for (const [name, href] of [
+    ["Dispatch Board", "/transport/dispatch-board"],
+    ["Schedule", "/transport/schedule"],
+    ["Transport Orders", "/transport/orders"],
+    ["Manifests", "/transport/manifests"],
+  ]) {
+    await expect(sidebar.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
+  }
+  await expect(sidebar.getByRole("button", { name: /^Tenders/ })).toBeDisabled();
 
   // 4. BUSINESS groups
   for (const group of ["Documents", "Billing", "Network"]) {

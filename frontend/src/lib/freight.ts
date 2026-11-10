@@ -146,6 +146,7 @@ export type ShipmentMilestone = {
   shipment_id: number;
   shipment_leg_id: number | null;
   code: string;
+  container_number?: string | null;
   title: string;
   description: string | null;
   location_name: string | null;
@@ -153,6 +154,23 @@ export type ShipmentMilestone = {
   occurred_at: string;
   is_exception: boolean;
   created_by_user?: { id: number; name: string };
+};
+
+export type DestinationPickup = {
+  customs_cleared: boolean;
+  ready_count: number;
+  containers: {
+    container_number: string;
+    carrier_release_confirmed: boolean;
+    terminal_pickup_authorized: boolean;
+    gated_out_at: string | null;
+    ready: boolean;
+  }[];
+  documents: {
+    id: number;
+    document_type: "bill_of_lading" | "delivery_order";
+    document_number: string | null;
+  }[];
 };
 
 export type Shipment = {
@@ -187,6 +205,7 @@ export type Shipment = {
   legs?: ShipmentLeg[];
   participants?: ShipmentParticipant[];
   milestones?: ShipmentMilestone[];
+  destination_pickup?: DestinationPickup | null;
 };
 
 export type FreightCatalog = {

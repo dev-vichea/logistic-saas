@@ -343,7 +343,7 @@ export function WorkspaceHeader({
           </div>
         ) : (
           /* Default Global Command Search Bar (⌘K) */
-          <div className="mx-2 hidden max-w-sm flex-1 sm:flex md:max-w-md lg:max-w-lg">
+          <div className="mx-2 hidden min-w-0 max-w-sm flex-1 sm:flex md:max-w-md lg:max-w-lg">
             <button
               type="button"
               onClick={onOpenSearch}
@@ -351,12 +351,12 @@ export function WorkspaceHeader({
               className="group flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-slate-50/70 px-3 text-xs text-slate-500 shadow-2xs transition-all hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <Search className="size-3.5 text-slate-400 transition-colors group-hover:text-blue-600" />
+                <Search className="size-3.5 shrink-0 text-slate-400 transition-colors group-hover:text-blue-600" />
                 <span className="truncate">
                   Search shipments, ASYCUDA SAD, fleet...
                 </span>
               </div>
-              <kbd className="hidden shrink-0 items-center gap-0.5 rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-400 shadow-2xs sm:inline-flex">
+              <kbd className="hidden shrink-0 items-center gap-0.5 rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-400 shadow-2xs xl:inline-flex">
                 ⌘K
               </kbd>
             </button>
@@ -367,7 +367,7 @@ export function WorkspaceHeader({
         <div className="flex items-center gap-2 sm:gap-2.5">
           {/* Operations Hub Live Telemetry Badge */}
           <div
-            className="hidden items-center gap-2 rounded-full border border-emerald-200/70 bg-emerald-50/60 px-2.5 py-1 text-[11px] font-medium text-emerald-800 lg:flex"
+            className="hidden items-center gap-2 rounded-full border border-emerald-200/70 bg-emerald-50/60 px-2.5 py-1 text-[11px] font-medium text-emerald-800 xl:flex"
             title={`Connected to ${hubCity} Gateway & ASYCUDA Online`}
           >
             <span className="relative flex size-2">
@@ -378,7 +378,7 @@ export function WorkspaceHeader({
               {hubCountry}
             </span>
             <span className="text-emerald-700">·</span>
-            <span>{hubCity} Hub</span>
+            <span className="max-w-28 truncate">{hubCity} Hub</span>
           </div>
 
           {/* Audit & Security Activity Bell */}

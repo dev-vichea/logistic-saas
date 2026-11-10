@@ -13,7 +13,6 @@ import {
   Loader2,
   ShieldCheck,
   Globe2,
-  Users,
 } from "lucide-react";
 import { api, csrf, errorMessage, safeNext } from "@/lib/api";
 import { Brand } from "@/components/brand";
@@ -22,6 +21,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const subscribeToHydration = () => () => {};
+const authInputClassName =
+  "h-11 border-input text-base placeholder:text-sm placeholder:text-muted-foreground sm:text-sm";
 type Mode =
   | "login"
   | "register"
@@ -162,26 +163,22 @@ export function AuthScreen({ mode }: { mode: Mode }) {
   const invitationNext =
     "/invitations/accept?token=" + encodeURIComponent(query.get("token") || "");
   return (
-    <div className="auth-layout min-h-screen grid lg:grid-cols-[1fr_1fr]">
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-[#0c1e3d] p-12 text-white lg:flex">
-        <Brand />
-        <div className="auth-orbit" aria-hidden="true" />
-        <div className="relative max-w-lg">
-          <span className="eyebrow text-sky-300">
-            BUILT FOR THE WAY YOU MOVE
-          </span>
-          <h1 className="mt-6 text-5xl font-semibold leading-[1.15] tracking-tight">
+    <div className="grid min-h-dvh lg:grid-cols-2">
+      <aside className="brand-surface hidden flex-col justify-between gap-12 p-12 text-white lg:flex xl:p-16">
+        <Brand inverse />
+        <div className="max-w-lg">
+          <p className="text-4xl leading-tight font-semibold tracking-tight xl:text-5xl">
             One workspace.
             <br />
             Every company.
             <br />
-            <span className="text-sky-300">Moving together.</span>
-          </h1>
-          <p className="mt-6 max-w-sm leading-7 text-blue-100/65">
+            <span className="text-blue-200">Moving together.</span>
+          </p>
+          <p className="mt-5 max-w-sm leading-7 text-blue-100">
             Connect your people and build the foundation for your logistics
             business across Southeast Asia.
           </p>
-          <div className="mt-10 flex flex-wrap gap-5 text-xs text-blue-100/80">
+          <div className="mt-8 flex flex-wrap gap-5 text-sm text-blue-100">
             <span className="flex gap-2">
               <ShieldCheck size={16} /> Secure by design
             </span>
@@ -190,22 +187,19 @@ export function AuthScreen({ mode }: { mode: Mode }) {
             </span>
           </div>
         </div>
-        <p className="relative text-xs text-blue-100/45">
+        <p className="text-xs text-blue-200">
           Mekong Logistics Platform · Foundation v0.1
         </p>
       </aside>
-      <main className="flex flex-col px-6 py-10 sm:px-12">
-        <div className="lg:invisible">
+      <main className="flex flex-col gap-8 bg-card px-6 py-7 sm:px-12 lg:bg-background">
+        <div className="lg:hidden">
           <Brand />
         </div>
-        <div className="m-auto w-full max-w-[390px] py-12">
-          <div className="mb-7 flex size-12 items-center justify-center rounded-2xl bg-blue-50 text-primary">
-            {mode === "invitation" ? <Users /> : <ShieldCheck />}
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight">
+        <div className="m-auto w-full max-w-md py-8 lg:rounded-xl lg:border lg:bg-card lg:p-8">
+          <h1 className="text-[1.75rem] leading-tight font-semibold tracking-tight">
             {titles[mode]}
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             {mode === "login"
               ? "Sign in to your logistics workspace."
               : mode === "register"
@@ -238,12 +232,15 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           {["login", "register", "forgot-password", "reset-password"].includes(
             mode,
           ) && (
-            <form method="post" onSubmit={submit} className="mt-8 space-y-5">
+            <form method="post" onSubmit={submit} className="mt-6 space-y-5">
               {mode === "register" && (
                 <div className="space-y-2">
-                  <Label htmlFor="name">Full name</Label>
+                  <Label htmlFor="name" className="text-sm">
+                    Full name
+                  </Label>
                   <Input
                     id="name"
+                    className={authInputClassName}
                     name="name"
                     autoComplete="name"
                     placeholder="Your full name"
@@ -254,9 +251,12 @@ export function AuthScreen({ mode }: { mode: Mode }) {
               )}
               {mode !== "reset-password" && (
                 <div className="space-y-2">
-                  <Label htmlFor="email">Work email</Label>
+                  <Label htmlFor="email" className="text-sm">
+                    Work email
+                  </Label>
                   <Input
                     id="email"
+                    className={authInputClassName}
                     name="email"
                     type="email"
                     autoComplete="email"
@@ -268,11 +268,13 @@ export function AuthScreen({ mode }: { mode: Mode }) {
               {["login", "register", "reset-password"].includes(mode) && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password" className="text-sm">
+                      Password
+                    </Label>
                     {mode === "login" && (
                       <Link
                         href="/forgot-password"
-                        className="text-xs font-medium text-primary"
+                        className="text-sm font-medium text-accent-foreground underline-offset-4 hover:underline"
                       >
                         Forgot password?
                       </Link>
@@ -280,6 +282,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                   </div>
                   <Input
                     id="password"
+                    className={authInputClassName}
                     name="password"
                     type="password"
                     autoComplete={
@@ -297,11 +300,12 @@ export function AuthScreen({ mode }: { mode: Mode }) {
               )}
               {["register", "reset-password"].includes(mode) && (
                 <div className="space-y-2">
-                  <Label htmlFor="password_confirmation">
+                  <Label htmlFor="password_confirmation" className="text-sm">
                     Confirm password
                   </Label>
                   <Input
                     id="password_confirmation"
+                    className={authInputClassName}
                     name="password_confirmation"
                     type="password"
                     autoComplete="new-password"
@@ -313,7 +317,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
               <Button
                 type="submit"
                 disabled={busy || !hydrated}
-                className="w-full"
+                className="h-11 w-full"
               >
                 {busy ? (
                   <Loader2 className="animate-spin" size={16} />
@@ -423,7 +427,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
               <>
                 New to Mekong?{" "}
                 <Link
-                  className="font-medium text-primary"
+                  className="font-medium text-accent-foreground underline-offset-4 hover:underline"
                   href={`/register?next=${encodeURIComponent(next)}`}
                 >
                   Create an account
@@ -433,14 +437,17 @@ export function AuthScreen({ mode }: { mode: Mode }) {
               <>
                 Already have an account?{" "}
                 <Link
-                  className="font-medium text-primary"
+                  className="font-medium text-accent-foreground underline-offset-4 hover:underline"
                   href={`/login?next=${encodeURIComponent(next)}`}
                 >
                   Sign in
                 </Link>
               </>
             ) : ["reset-password", "forgot-password"].includes(mode) ? (
-              <Link href="/login" className="font-medium text-primary">
+              <Link
+                href="/login"
+                className="font-medium text-accent-foreground underline-offset-4 hover:underline"
+              >
                 Back to sign in
               </Link>
             ) : null}

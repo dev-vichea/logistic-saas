@@ -14,7 +14,13 @@ import {
   Mail,
 } from "lucide-react";
 import { useWorkspace } from "@/components/workspace";
-import { NoOrganization, Loading, ErrorBox, Empty } from "@/components/common";
+import {
+  NoOrganization,
+  Loading,
+  ErrorBox,
+  Empty,
+  Pagination,
+} from "@/components/common";
 import { useResource } from "@/lib/use-resource";
 import {
   partnerRoot,
@@ -24,6 +30,7 @@ import {
 } from "@/lib/partners";
 import { Button } from "@/components/ui/button";
 import { MekongDataGrid } from "@/components/ui/data-grid";
+import { Input } from "@/components/ui/input";
 import { PartnerStatus } from "./fields";
 import {
   WorkspaceHeaderSlot,
@@ -33,10 +40,14 @@ import {
   ViewSettingsButton,
 } from "@/components/navigation/header-context";
 
+const directoryTitles = { carrier: "Carriers", broker: "Brokers" };
+
 export function PartnerList({
   contactsMode = false,
+  directoryRole,
 }: {
   contactsMode?: boolean;
+  directoryRole?: keyof typeof directoryTitles;
 }) {
   const { organization, can } = useWorkspace();
   const [search, setSearch] = useState<string>("");
@@ -45,18 +56,27 @@ export function PartnerList({
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [activeView, setActiveView] = useState<string>("default");
+  const [page, setPage] = useState(1);
+  const title = directoryRole
+    ? directoryTitles[directoryRole]
+    : contactsMode ? "Contacts & Sites" : "Business Partners";
+  const allowed = can("partners.view");
 
   const catalogRes = useResource<{ data: PartnerCatalog }>(
-    organization ? `${partnerRoot(organization.id)}/catalog` : null
+    organization && allowed ? `${partnerRoot(organization.id)}/catalog` : null
   );
 
   const queryParams = new URLSearchParams();
-  queryParams.set("per_page", "100");
+  queryParams.set("per_page", directoryRole ? "25" : "100");
   if (search.trim()) queryParams.set("q", search.trim());
 
-  if (tab === "shipper") queryParams.set("role", "shipper");
+  if (directoryRole) {
+    queryParams.set("role", directoryRole);
+    queryParams.set("page", String(page));
+    queryParams.set("status", statusFilter);
+  } else if (tab === "shipper") queryParams.set("role", "shipper");
   else if (tab === "carrier") queryParams.set("role", "carrier");
-  else if (tab === "customs_broker") queryParams.set("role", "customs_broker");
+  else if (tab === "broker") queryParams.set("role", "broker");
   else if (tab === "archived") queryParams.set("status", "archived");
   else {
     if (roleFilter !== "all") queryParams.set("role", roleFilter);
@@ -66,7 +86,7 @@ export function PartnerList({
   if (countryFilter !== "all") queryParams.set("country_code", countryFilter);
 
   const partnersRes = useResource<PartnerPage>(
-    organization ? `${partnerRoot(organization.id)}?${queryParams.toString()}` : null
+    organization && allowed ? `${partnerRoot(organization.id)}?${queryParams.toString()}` : null
   );
 
   const catalog = catalogRes.data?.data;
@@ -82,10 +102,16 @@ export function PartnerList({
     search.trim() !== "";
 
   const resetAllFilters = () => {
+    setPage(1);
     setRoleFilter("all");
     setCountryFilter("all");
     setStatusFilter("all");
     setSearch("");
+  };
+
+  const updateSearch = (value: string) => {
+    setPage(1);
+    setSearch(value);
   };
 
   const columnDefs = useMemo<(ColDef<Partner> | ColGroupDef<Partner>)[]>(() => {
@@ -93,7 +119,7 @@ export function PartnerList({
       {
         headerName: "Partner Name",
         field: "name",
-        minWidth: 200,
+        minWidth: directoryRole ? 240 : 200,
         pinned: "left",
         cellRenderer: (params: CustomCellRendererProps<Partner>) => {
           const partner = params.data;
@@ -106,6 +132,7 @@ export function PartnerList({
               <div className="flex flex-col min-w-0 leading-tight">
                 <Link
                   href={`/partners/${partner.id}`}
+                  title={partner.name}
                   className="font-semibold text-slate-900 hover:text-blue-900 truncate text-xs"
                 >
                   {partner.name}
@@ -253,6 +280,9 @@ export function PartnerList({
       },
     ];
 
+    if (directoryRole) {
+      return allCols.filter((col) => col.headerName !== "Actions");
+    }
     if (activeView === "roles") {
       return allCols.filter((col) => {
         const name = "headerName" in col ? col.headerName : "";
@@ -266,24 +296,26 @@ export function PartnerList({
       });
     }
     return allCols;
-  }, [catalog, activeView]);
+  }, [catalog, activeView, directoryRole]);
 
   if (!organization) return <NoOrganization />;
+  if (!allowed)
+    return <ErrorBox message="You do not have access to the partner directory." />;
   if (catalogRes.error) return <ErrorBox message={catalogRes.error} />;
-  if (partnersRes.error) return <ErrorBox message={partnersRes.error} />;
   if (!catalogRes.data) return <Loading />;
 
   return (
     <div className="flex flex-col h-full w-full">
+      {directoryRole && <h1 className="sr-only">{title}</h1>}
       <WorkspaceHeaderSlot
         fullWidth={true}
-        title={contactsMode ? "Contacts & Sites" : "Business Partners"}
+        title={title}
         icon={Building2}
-        tabs={[
+        tabs={directoryRole ? undefined : [
           { id: "all", label: "All Partners", count: rawPartners.length },
           { id: "shipper", label: "Shippers / Clients" },
           { id: "carrier", label: "Carriers & Fleet" },
-          { id: "customs_broker", label: "Customs Brokers" },
+          { id: "broker", label: "Customs Brokers" },
           { id: "archived", label: "Archived" },
         ]}
         activeTab={tab}
@@ -291,10 +323,14 @@ export function PartnerList({
           setTab(newTab);
         }}
         searchValue={search}
-        onSearchChange={setSearch}
+        onSearchChange={directoryRole ? undefined : updateSearch}
         searchPlaceholder="Search company, code, contact or site..."
         primaryAction={
-          can("partners.manage") ? (
+          directoryRole ? (
+            <Button asChild variant="outline">
+              <Link href="/partners">All partners</Link>
+            </Button>
+          ) : can("partners.manage") ? (
             <Link href="/partners/new">
               <Button className="h-9 gap-1.5 bg-blue-900 hover:bg-blue-800 text-white shadow-xs text-xs font-semibold px-3.5">
                 <Plus size={14} />
@@ -305,18 +341,30 @@ export function PartnerList({
         }
         subHeader={
           <>
-            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-              <FloatingFilterSelect
-                label="Role"
-                value={roleFilter}
-                allLabel="All Roles"
-                options={Object.entries(catalog?.roles || {}).map(([val, lbl]) => ({
-                  value: val,
-                  label: lbl,
-                }))}
-                onChange={setRoleFilter}
-                minWidth="min-w-[130px]"
-              />
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              {directoryRole ? (
+                <Input
+                  type="search"
+                  aria-label={`Search ${title.toLowerCase()}`}
+                  placeholder={`Search ${title.toLowerCase()}…`}
+                  maxLength={120}
+                  value={search}
+                  onChange={(event) => updateSearch(event.target.value)}
+                  className="h-9 w-full placeholder:text-muted-foreground sm:w-52"
+                />
+              ) : (
+                <FloatingFilterSelect
+                  label="Role"
+                  value={roleFilter}
+                  allLabel="All Roles"
+                  options={Object.entries(catalog?.roles || {}).map(([val, lbl]) => ({
+                    value: val,
+                    label: lbl,
+                  }))}
+                  onChange={setRoleFilter}
+                  minWidth="min-w-[130px]"
+                />
+              )}
               <FloatingFilterSelect
                 label="Country"
                 value={countryFilter}
@@ -325,7 +373,10 @@ export function PartnerList({
                   value: code,
                   label: `${code} - ${name}`,
                 }))}
-                onChange={setCountryFilter}
+                onChange={(value) => {
+                  setPage(1);
+                  setCountryFilter(value);
+                }}
                 minWidth="min-w-[140px]"
               />
               <FloatingFilterSelect
@@ -336,36 +387,49 @@ export function PartnerList({
                   { value: "active", label: "Active" },
                   { value: "archived", label: "Archived" },
                 ]}
-                onChange={setStatusFilter}
+                onChange={(value) => {
+                  setPage(1);
+                  setStatusFilter(value);
+                }}
                 minWidth="min-w-[115px]"
               />
               {hasActiveFilters && (
                 <FilterResetButton onReset={resetAllFilters} />
               )}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <ViewPresetSelector
-                activeView={activeView}
-                presets={[
-                  { id: "default", label: "Default View", desc: "All company details & contacts" },
-                  { id: "roles", label: "Roles & Regions", desc: "Shipper/carrier & country" },
-                  { id: "network", label: "Sites & Network", desc: "Phone, email & locations" },
-                ]}
-                onSelectView={setActiveView}
-              />
-              <ViewSettingsButton onClick={resetAllFilters} />
-            </div>
+            {!directoryRole && (
+              <div className="flex items-center gap-2 shrink-0">
+                <ViewPresetSelector
+                  activeView={activeView}
+                  presets={[
+                    { id: "default", label: "Default View", desc: "All company details & contacts" },
+                    { id: "roles", label: "Roles & Regions", desc: "Shipper/carrier & country" },
+                    { id: "network", label: "Sites & Network", desc: "Phone, email & locations" },
+                  ]}
+                  onSelectView={setActiveView}
+                />
+                <ViewSettingsButton onClick={resetAllFilters} />
+              </div>
+            )}
           </>
         }
       />
 
-      {rawPartners.length === 0 ? (
+      {partnersRes.error ? (
+        <div className="p-6">
+          <ErrorBox message={partnersRes.error} />
+        </div>
+      ) : !partnersRes.data ? (
+        <Loading />
+      ) : rawPartners.length === 0 ? (
         <div className="p-8">
           <Empty
-            title="No Partners Found"
-            description="Add your first business partner or adjust your search and filters."
+            title={directoryRole ? `No ${title.toLowerCase()} found` : "No Partners Found"}
+            description={directoryRole
+              ? "Adjust your filters or check the roles assigned to companies in the partner directory."
+              : "Add your first business partner or adjust your search and filters."}
             action={
-              can("partners.manage") ? (
+              !directoryRole && can("partners.manage") ? (
                 <Link href="/partners/new">
                   <Button className="gap-2 bg-blue-900 text-white">
                     <Plus size={15} />
@@ -380,10 +444,23 @@ export function PartnerList({
         <MekongDataGrid<Partner>
           rowData={rawPartners}
           columnDefs={columnDefs}
-          title="Directory of Business Partners"
+          title={directoryRole ? undefined : "Directory of Business Partners"}
+          enableQuickFilter={!directoryRole}
+          enableSelection={!directoryRole}
+          showRowNumbers={!directoryRole}
           quickFilterPlaceholder="Quick search partners..."
           className="flex-1 min-h-0"
+          gridOptions={directoryRole ? { pagination: false } : undefined}
         />
+      )}
+      {directoryRole && partnersRes.data && partnersRes.data.last_page > 1 && (
+        <div className="shrink-0 border-t px-4 pb-4">
+          <Pagination
+            page={partnersRes.data.current_page}
+            last={partnersRes.data.last_page}
+            onChange={setPage}
+          />
+        </div>
       )}
     </div>
   );

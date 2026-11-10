@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Building2,
   ArrowUpRight,
-  Compass,
 } from "lucide-react";
 import { useWorkspace } from "@/components/workspace";
 import { useResource } from "@/lib/use-resource";
@@ -92,12 +91,11 @@ export function Dashboard() {
   return (
     <>
       <PageHeading
-        eyebrow="YOUR WORKSPACE AT A GLANCE"
         title={`Welcome back, ${user.name.split(" ")[0]}`}
         description={`Here’s what’s happening at ${org.name.replace(/\.$/, "")}.`}
         action={
           can("team.manage") ? (
-            <Button asChild>
+            <Button asChild className="h-10 px-3.5">
               <Link href="/team?invite=1">
                 <Users size={16} />
                 Invite a member
@@ -106,58 +104,59 @@ export function Dashboard() {
           ) : undefined
         }
       />
-      <section className="relative mb-7 overflow-hidden rounded-2xl bg-[#0c2340] px-7 py-8 text-white sm:px-9">
-        <div className="hero-grid" aria-hidden="true" />
-        <div className="relative z-10 max-w-lg">
-          <div className="mb-5 flex items-center gap-2 text-[10px] font-semibold tracking-[.16em] text-blue-200">
-            <span className="size-1.5 rounded-full bg-blue-300" />
-            YOUR CONNECTED FOUNDATION
-          </div>
-          <h2 className="text-2xl font-medium tracking-tight sm:text-[28px]">
-            Good logistics starts with
-            <br className="hidden sm:block" /> a connected team.
-          </h2>
-          <p className="mt-3 max-w-md text-sm leading-6 text-blue-100/65">
-            Your companies, people and business activities.
-            <br />
-            One shared space to build what comes next.
-          </p>
-          <Link
-            href="/settings"
-            className="mt-6 inline-flex items-center gap-3 text-xs font-medium text-white"
-          >
-            View company profile
-            <ArrowRight size={15} />
-          </Link>
-        </div>
-        <div className="absolute right-10 top-12 hidden size-40 rotate-[-12deg] items-center justify-center rounded-3xl border border-blue-100/15 bg-white/5 xl:flex">
-          <Compass
-            size={88}
-            strokeWidth={0.8}
-            className="text-blue-100/70"
-          />
-        </div>
-      </section>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        aria-label="Workspace metrics"
+        className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4"
+      >
         {cards.map((c) => (
-          <Link href={c.href} key={c.label} className="metric-card group">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
+          <Link
+            href={c.href}
+            key={c.label}
+            className="metric-card flex min-w-0 flex-col"
+          >
+            <div className="flex flex-1 items-start justify-between gap-2">
+              <span className="text-sm leading-snug font-medium">
                 {c.label}
               </span>
-              <c.icon size={16} className="text-primary/75" />
+              <c.icon
+                size={16}
+                aria-hidden="true"
+                className="mt-0.5 shrink-0 text-accent-foreground"
+              />
             </div>
-            <p className="mt-4 text-3xl font-semibold tracking-tight">
-              {c.value.toString().padStart(2, "0")}
+            <p className="mt-3 text-3xl leading-none font-semibold tracking-tight">
+              {c.value.toLocaleString("en")}
             </p>
-            <p className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
+            <p className="mt-2 flex items-end justify-between gap-1 text-xs leading-5 text-muted-foreground">
               {c.detail}
-              <ArrowUpRight size={13} className="group-hover:text-primary" />
+              <ArrowUpRight
+                size={14}
+                aria-hidden="true"
+                className="mb-0.5 shrink-0"
+              />
             </p>
           </Link>
         ))}
-      </div>
-      <div className="mt-7 grid gap-6 xl:grid-cols-[1.15fr_1fr]">
+      </section>
+      <section className="brand-surface mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-4 rounded-xl px-5 py-5 text-white sm:px-6">
+        <div>
+          <h2 className="text-lg font-semibold">
+            Good logistics starts with a connected team.
+          </h2>
+          <p className="mt-1.5 max-w-prose text-sm leading-6 text-pretty text-blue-100">
+            Your companies, people and business activities. One shared space to
+            build what comes next.
+          </p>
+        </div>
+        <Link
+          href="/settings"
+          className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-blue-200/40 px-3 text-sm font-medium transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-200"
+        >
+          View company profile
+          <ArrowRight size={16} aria-hidden="true" />
+        </Link>
+      </section>
+      <div className="mt-6 grid gap-5 lg:grid-cols-2">
         <section className="panel">
           <div className="panel-heading">
             <div>
@@ -166,35 +165,53 @@ export function Dashboard() {
             </div>
             <Badge variant="secondary">{completed} of 4</Badge>
           </div>
-          <div className="mx-6 mt-1 h-1 overflow-hidden rounded-full bg-muted">
+          <div
+            aria-hidden="true"
+            className="mx-6 h-1 overflow-hidden rounded-full bg-muted"
+          >
             <div
               className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${completed * 25}%` }}
             />
           </div>
-          <div className="p-4">
+          <ul className="px-4 pt-2 pb-4">
             {checks.map((c, i) => (
-              <Link
-                key={c.label}
-                href={c.href}
-                className="flex items-center gap-3 rounded-lg px-2 py-4 hover:bg-muted/60"
-              >
-                {c.done ? (
-                  <CheckCircle2 size={20} className="text-primary" />
-                ) : (
-                  <span className="flex size-5 items-center justify-center rounded-full border text-[10px] text-muted-foreground">
-                    {i + 1}
-                  </span>
-                )}
-                <span
-                  className={`flex-1 text-xs ${c.done ? "text-muted-foreground" : "font-medium"}`}
+              <li key={c.label}>
+                <Link
+                  href={c.href}
+                  className="flex items-center gap-3 rounded-lg px-2 py-3 text-sm hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring"
                 >
-                  {c.label}
-                </span>
-                <ArrowRight size={14} className="text-muted-foreground" />
-              </Link>
+                  {c.done ? (
+                    <CheckCircle2
+                      size={18}
+                      aria-hidden="true"
+                      className="shrink-0 text-status-success"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex size-[18px] shrink-0 items-center justify-center rounded-full border text-xs text-muted-foreground"
+                    >
+                      {i + 1}
+                    </span>
+                  )}
+                  <span
+                    className={`flex-1 ${c.done ? "text-muted-foreground" : "font-medium"}`}
+                  >
+                    {c.label}
+                    <span className="sr-only">
+                      {c.done ? ", complete" : ", incomplete"}
+                    </span>
+                  </span>
+                  <ArrowRight
+                    size={14}
+                    aria-hidden="true"
+                    className="shrink-0 text-muted-foreground"
+                  />
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
         <section className="panel">
           <div className="panel-heading">
@@ -206,20 +223,23 @@ export function Dashboard() {
           </div>
           <div className="px-6 pb-6">
             <div className="flex items-center gap-3 border-b pb-5">
-              <div className="flex size-11 items-center justify-center rounded-xl bg-blue-50 text-lg font-semibold text-primary">
+              <div
+                aria-hidden="true"
+                className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-base font-semibold text-accent-foreground"
+              >
                 {org.name.slice(0, 1)}
               </div>
               <div>
-                <h3 className="text-sm font-semibold">{org.name}</h3>
+                <h3 className="text-sm font-semibold [overflow-wrap:anywhere]">
+                  {org.name}
+                </h3>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {catalog.countries[org.country_code]}{" "}
                   <span className="mx-1">·</span> {org.currency}
                 </p>
               </div>
             </div>
-            <p className="eyebrow mt-5 mb-3 text-muted-foreground">
-              BUSINESS ACTIVITIES
-            </p>
+            <p className="mt-5 mb-2 text-sm font-medium">Business activities</p>
             <div className="flex flex-wrap gap-2">
               {org.activities.map((a) => (
                 <Badge key={a} variant="secondary" className="font-normal">
@@ -229,7 +249,7 @@ export function Dashboard() {
             </div>
             <Link
               href="/settings"
-              className="mt-6 inline-flex items-center gap-2 text-xs font-medium text-primary"
+              className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-accent-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               Manage company details
               <ArrowRight size={14} />
@@ -238,7 +258,7 @@ export function Dashboard() {
         </section>
       </div>
       {can("audit.view") && (
-        <section className="panel mt-7">
+        <section className="panel mt-6">
           <div className="panel-heading">
             <div>
               <h2>Recent activity</h2>
@@ -246,7 +266,7 @@ export function Dashboard() {
             </div>
             <Link
               href="/audit"
-              className="flex items-center gap-2 text-xs text-primary"
+              className="flex shrink-0 items-center gap-2 text-sm font-medium text-accent-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               View all
               <ArrowRight size={14} />
@@ -258,13 +278,19 @@ export function Dashboard() {
                 key={event.id}
                 className="flex items-center gap-3 border-t py-4"
               >
-                <div className="size-2 rounded-full bg-blue-300" />
-                <span className="flex-1 text-xs capitalize">
+                <div
+                  aria-hidden="true"
+                  className="size-1.5 shrink-0 rounded-full bg-blue-400"
+                />
+                <span className="flex-1 text-sm capitalize">
                   {actionLabel(event.action)}
                 </span>
-                <span className="text-[10px] text-muted-foreground">
+                <time
+                  dateTime={event.created_at}
+                  className="shrink-0 text-xs text-muted-foreground tabular-nums"
+                >
                   {formatDate(event.created_at, org.timezone)}
-                </span>
+                </time>
               </div>
             ))}
           </div>

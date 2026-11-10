@@ -98,6 +98,16 @@ export type DispatchTrip = {
   proof_of_deliveries?: ProofOfDelivery[];
 };
 
+export const tripStatusLabels: Record<DispatchTrip["status"], string> = {
+  draft: "Draft",
+  dispatched: "Dispatched",
+  loading: "Loading",
+  in_transit: "In transit",
+  unloading: "Unloading",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
 export type TransportationCatalog = {
   vehicle_types: { value: string; label: string }[];
   ownership_types: { value: string; label: string }[];

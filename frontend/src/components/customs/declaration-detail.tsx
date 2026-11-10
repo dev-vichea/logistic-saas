@@ -462,7 +462,7 @@ export function DeclarationDetail({ declarationId }: { declarationId: number }) 
                     <SelectItem value="lodged">Lodged in ASYCUDA World</SelectItem>
                     <SelectItem value="under_inspection">Under Customs Inspection</SelectItem>
                     <SelectItem value="cleared">Customs Cleared & Tax Exempted</SelectItem>
-                    <SelectItem value="released">Gate Release Order Issued</SelectItem>
+                    <SelectItem value="released">Customs Release Recorded</SelectItem>
                     <SelectItem value="rejected">Rejected / Disputed by Customs</SelectItem>
                   </SelectContent>
                 </Select>

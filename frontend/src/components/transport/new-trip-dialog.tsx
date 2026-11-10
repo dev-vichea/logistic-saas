@@ -28,13 +28,16 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { api, errorMessage } from "@/lib/api";
 import { transportRoot, type TransportationCatalog } from "@/lib/transportation";
+import { dateTimeInZone } from "./schedule-time";
 
 export function NewTripDialog({
   catalog,
   onCreated,
+  triggerLabel = "Plan Dispatch Run-Sheet",
 }: {
   catalog: TransportationCatalog;
   onCreated?: () => void;
+  triggerLabel?: string;
 }) {
   const { organization } = useWorkspace();
   const router = useRouter();
@@ -51,6 +54,7 @@ export function NewTripDialog({
     container_number: "",
     seal_number: "",
     scheduled_start_time: "",
+    scheduled_end_time: "",
     notes: "",
   });
 
@@ -79,7 +83,16 @@ export function NewTripDialog({
       if (formData.driver_id) payload.driver_id = Number(formData.driver_id);
       if (formData.container_number.trim()) payload.container_number = formData.container_number.trim();
       if (formData.seal_number.trim()) payload.seal_number = formData.seal_number.trim();
-      if (formData.scheduled_start_time) payload.scheduled_start_time = formData.scheduled_start_time;
+      const pickup = formData.scheduled_start_time && dateTimeInZone(formData.scheduled_start_time, organization.timezone);
+      const delivery = formData.scheduled_end_time && dateTimeInZone(formData.scheduled_end_time, organization.timezone);
+      if (pickup === null || delivery === null) {
+        throw new Error("Choose a time that exists in your organization’s timezone.");
+      }
+      if (delivery && (!pickup || delivery <= pickup)) {
+        throw new Error("Delivery must be after the scheduled pickup.");
+      }
+      if (pickup) payload.scheduled_start_time = pickup;
+      if (delivery) payload.scheduled_end_time = delivery;
       if (formData.notes.trim()) payload.notes = formData.notes.trim();
       if (selectedLegIds.length > 0) payload.shipment_leg_ids = selectedLegIds;
 
@@ -102,7 +115,7 @@ export function NewTripDialog({
       <SheetTrigger asChild>
         <Button className="h-9 gap-1.5 shadow-2xs">
           <Plus size={16} />
-          <span>Plan Dispatch Run-Sheet</span>
+          <span>{triggerLabel}</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" size="4/5" className="p-0">
@@ -150,13 +163,25 @@ export function NewTripDialog({
                 </div>
                 <div>
                   <Label htmlFor="scheduled_start_time" className="text-xs font-semibold text-slate-700">
-                    Scheduled Departure Time
+                    Scheduled pickup ({organization?.timezone})
                   </Label>
                   <Input
                     id="scheduled_start_time"
                     type="datetime-local"
                     value={formData.scheduled_start_time}
                     onChange={(e) => setFormData({ ...formData, scheduled_start_time: e.target.value })}
+                    className="mt-1 bg-white text-sm"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="scheduled_end_time" className="text-xs font-semibold text-slate-700">
+                    Scheduled delivery ({organization?.timezone})
+                  </Label>
+                  <Input
+                    id="scheduled_end_time"
+                    type="datetime-local"
+                    value={formData.scheduled_end_time}
+                    onChange={(e) => setFormData({ ...formData, scheduled_end_time: e.target.value })}
                     className="mt-1 bg-white text-sm"
                   />
                 </div>

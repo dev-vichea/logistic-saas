@@ -111,6 +111,111 @@ class TransportationDispatchTest extends TestCase
         return "/api/v1/organizations/{$org->id}/transport/{$path}";
     }
 
+    public function test_dispatch_views_filter_runs_and_scope_shipment_cargo(): void
+    {
+        $this->actingAs($this->ownerA);
+
+        $trips = [];
+        foreach ([
+            'outside-after' => ['2026-11-11 17:00:00', 'draft'],
+            'scheduled-later' => ['2026-11-11 16:59:59', 'loading'],
+            'scheduled-first' => ['2026-11-10 17:00:00', 'in_transit'],
+            'outside-before' => ['2026-11-10 16:59:59', 'completed'],
+            'unscheduled' => [null, 'draft'],
+        ] as $reference => [$start, $status]) {
+            $trips[$reference] = $this->orgA->dispatchTrips()->create([
+                'trip_number' => $reference,
+                'origin_location_id' => $this->originA->id,
+                'destination_location_id' => $this->destA->id,
+                'scheduled_start_time' => $start,
+                'status' => $status,
+            ]);
+        }
+
+        $this->getJson($this->url($this->orgA, 'trips?schedule=scheduled&from=2026-11-11&through=2026-11-11'))
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.trip_number', 'scheduled-first')
+            ->assertJsonPath('data.1.trip_number', 'scheduled-later');
+        $this->getJson($this->url($this->orgA, 'trips?schedule=scheduled&from=2026-11-12&through=2026-11-11'))
+            ->assertUnprocessable();
+        $this->getJson($this->url($this->orgA, 'trips?schedule=unscheduled'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.trip_number', 'unscheduled');
+        $this->getJson($this->url($this->orgA, 'trips?stage=active&per_page=1'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('total', 2);
+
+        $trip = $trips['scheduled-first'];
+        $trip->tripLegs()->create([
+            'organization_id' => $this->orgA->id,
+            'shipment_leg_id' => $this->shipmentA->legs()->firstOrFail()->id,
+        ]);
+        $this->shipmentA->cargoItems()->create([
+            'organization_id' => $this->orgA->id,
+            'description' => 'Garment cartons',
+            'quantity' => 32,
+        ]);
+
+        $this->getJson($this->url($this->orgA, 'trips?include=legs'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.trip_legs.0.shipment_leg.shipment.shipment_number', 'SHP-TEST-0001');
+        $this->getJson($this->url($this->orgA, "trips/{$trip->id}?include=manifest"))
+            ->assertOk()
+            ->assertJsonPath('data.trip_legs.0.shipment_leg.shipment.cargo_items.0.description', 'Garment cartons');
+
+        $this->actingAs($this->ownerB);
+        $this->getJson($this->url($this->orgB, 'trips?include=legs'))->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson($this->url($this->orgB, "trips/{$trip->id}?include=manifest"))->assertNotFound();
+        $this->getJson($this->url($this->orgA, 'trips?include=legs'))->assertNotFound();
+    }
+
+    public function test_weekly_schedule_includes_carryover_idle_vehicles_and_unassigned_trips(): void
+    {
+        $this->actingAs($this->ownerA);
+        $truck = $this->orgA->vehicles()->create([
+            'plate_number' => '3A-2100', 'make_model' => 'Hino', 'max_payload_kg' => 10000,
+        ]);
+        $this->orgA->vehicles()->create([
+            'plate_number' => '3A-2101', 'make_model' => 'Isuzu', 'max_payload_kg' => 8000,
+        ]);
+        $route = ['origin_location_id' => $this->originA->id, 'destination_location_id' => $this->destA->id];
+        $this->orgA->dispatchTrips()->create($route + [
+            'trip_number' => 'Carryover', 'vehicle_id' => $truck->id,
+            'scheduled_start_time' => '2026-11-08 16:00:00',
+            'scheduled_end_time' => '2026-11-08 18:00:00', 'status' => 'in_transit',
+        ]);
+        $this->orgA->dispatchTrips()->create($route + [
+            'trip_number' => 'Outside week', 'vehicle_id' => $truck->id,
+            'scheduled_start_time' => '2026-11-15 17:00:00',
+        ]);
+        $this->orgA->dispatchTrips()->create($route + [
+            'trip_number' => 'Waiting on a truck', 'scheduled_start_time' => '2026-11-10 02:00:00',
+        ]);
+
+        $query = 'schedule?week=2026-11-09';
+        $this->getJson($this->url($this->orgA, $query))->assertOk()
+            ->assertJsonCount(2, 'vehicles.data')
+            ->assertJsonCount(1, 'vehicles.data.0.trips')
+            ->assertJsonPath('vehicles.data.0.trips.0.trip_number', 'Carryover')
+            ->assertJsonCount(0, 'vehicles.data.1.trips')
+            ->assertJsonPath('unassigned.data.0.trip_number', 'Waiting on a truck');
+        $this->getJson($this->url($this->orgA, $query.'&q=Isuzu'))->assertOk()
+            ->assertJsonCount(1, 'vehicles.data')->assertJsonPath('vehicles.data.0.plate_number', '3A-2101');
+        $this->getJson($this->url($this->orgA, $query.'&status=in_transit'))->assertOk()
+            ->assertJsonCount(1, 'vehicles.data')->assertJsonCount(0, 'unassigned.data');
+        $this->getJson($this->url($this->orgA, 'schedule?week=2026-10-26'))->assertOk()
+            ->assertJsonPath('latest_start', '2026-11-15T17:00:00.000000Z');
+
+        $this->actingAs($this->ownerB);
+        $this->getJson($this->url($this->orgA, $query))->assertNotFound();
+        $this->getJson($this->url($this->orgB, $query))->assertOk()
+            ->assertJsonCount(0, 'vehicles.data')->assertJsonCount(0, 'unassigned.data');
+    }
+
     public function test_can_manage_fleet_vehicles_and_drivers(): void
     {
         $this->actingAs($this->ownerA);

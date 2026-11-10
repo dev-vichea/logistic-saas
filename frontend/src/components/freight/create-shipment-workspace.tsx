@@ -1103,7 +1103,7 @@ export function CreateShipmentWorkspace({
                       <SelectItem value="pending_docs" className="text-xs">Pending Documents (Export/Import)</SelectItem>
                       <SelectItem value="declaration_drafted" className="text-xs">ASYCUDA Declaration Drafted</SelectItem>
                       <SelectItem value="under_inspection" className="text-xs">Port / Border Inspection</SelectItem>
-                      <SelectItem value="cleared" className="text-xs">Customs Cleared & Released</SelectItem>
+                      <SelectItem value="cleared" className="text-xs">Customs Cleared</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

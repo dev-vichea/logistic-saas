@@ -14,13 +14,13 @@ export function PageHeading({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
-      <div>
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+      <div className="min-w-0">
         {eyebrow && <p className="eyebrow mb-2 text-primary">{eyebrow}</p>}
-        <h1 className="text-[28px] font-semibold tracking-tight sm:text-3xl">
+        <h1 className="text-[1.75rem] leading-tight font-semibold tracking-tight [overflow-wrap:anywhere]">
           {title}
         </h1>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        <p className="mt-1.5 max-w-prose text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
           {description}
         </p>
       </div>

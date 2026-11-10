@@ -66,6 +66,7 @@ export interface MekongDataGridProps<TData = Record<string, unknown>> {
   height?: number | string;
   className?: string;
   title?: string;
+  enableQuickFilter?: boolean;
   quickFilterPlaceholder?: string;
   enableSelection?: boolean;
   enableExport?: boolean;
@@ -87,6 +88,7 @@ export function MekongDataGrid<TData = Record<string, unknown>>({
   height,
   className = "",
   title,
+  enableQuickFilter = true,
   quickFilterPlaceholder = "Quick filter in table...",
   enableSelection = true,
   enableExport = true,
@@ -242,14 +244,14 @@ export function MekongDataGrid<TData = Record<string, unknown>>({
       {/* Vektor-Grade Controls Utility Bar */}
       <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-200/80 bg-slate-50/70 px-3.5 py-1.5 shrink-0">
         {/* Left: Quick Search Filter & Title / Stats */}
-        <div className="flex items-center gap-2.5 flex-1 min-w-[240px]">
+        <div className={enableQuickFilter ? "flex min-w-[240px] flex-1 items-center gap-2.5" : "flex flex-1 items-center gap-2.5"}>
           {title && (
             <span className="font-semibold text-xs text-slate-800 tracking-tight shrink-0 mr-1">
               {title}
             </span>
           )}
 
-          <div className="relative w-full max-w-xs">
+          {enableQuickFilter && <div className="relative w-full max-w-xs">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -267,7 +269,7 @@ export function MekongDataGrid<TData = Record<string, unknown>>({
                 ✕
               </button>
             )}
-          </div>
+          </div>}
 
           <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500 font-mono">
             <span className="font-semibold text-slate-700">{rowData.length}</span>

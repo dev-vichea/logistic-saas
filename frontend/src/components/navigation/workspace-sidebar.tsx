@@ -639,18 +639,16 @@ export function WorkspaceSidebar(props: Props) {
               <button
                 type="button"
                 onClick={openSearch}
-                className="group flex w-full items-center justify-between rounded-xl border border-slate-200/90 bg-gradient-to-r from-slate-50 to-blue-50/50 p-2 text-xs font-semibold text-slate-800 shadow-2xs transition-all hover:border-blue-300 hover:bg-blue-50/80"
+                className="flex w-full items-center justify-between rounded-lg border bg-card p-2 text-xs font-semibold text-card-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 title="ShipFlow Assistant (⌘J / ⌘K)"
               >
                 <div className="flex items-center gap-2">
-                  <div className="flex size-6 items-center justify-center rounded-lg bg-gradient-to-tr from-blue-900 via-blue-700 to-sky-500 text-white shadow-2xs">
+                  <div className="flex size-6 items-center justify-center rounded-md bg-accent text-accent-foreground">
                     <Sparkles size={13} />
                   </div>
-                  <span className="font-semibold text-slate-800">
-                    ShipFlow AI
-                  </span>
+                  <span>ShipFlow AI</span>
                 </div>
-                <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-500 shadow-2xs">
+                <kbd className="rounded border bg-card px-1.5 py-0.5 font-mono text-[11px] font-normal text-muted-foreground">
                   ⌘K
                 </kbd>
               </button>

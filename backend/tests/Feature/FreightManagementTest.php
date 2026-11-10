@@ -269,7 +269,8 @@ class FreightManagementTest extends TestCase
 
         $this->getJson($this->url($this->orgA, "shipments/{$shipId}"))
             ->assertOk()
-            ->assertJsonPath('data.status', 'dispatched');
+            ->assertJsonPath('data.status', 'dispatched')
+            ->assertJsonPath('data.destination_pickup', null);
 
         // 4. Add customs milestone (customs cleared decoupled from in_transit)
         $this->postJson($this->url($this->orgA, "shipments/{$shipId}/milestones"), [
@@ -297,6 +298,91 @@ class FreightManagementTest extends TestCase
         // Delete cargo item
         $this->deleteJson($this->url($this->orgA, "shipments/{$shipId}/cargo-items/{$cargoId}"))
             ->assertOk();
+    }
+
+    public function test_ocean_pickup_tracks_release_and_gate_out_per_container(): void
+    {
+        $this->actingAs($this->ownerA);
+        $id = $this->postJson($this->url($this->orgA, 'shipments'), [
+            'customer_id' => $this->customerA->id,
+            'origin_location_id' => $this->originA->id,
+            'destination_location_id' => $this->destA->id,
+            'transport_mode' => 'ocean_fcl',
+            'customs_status' => 'pending_docs',
+            'cargo_items' => [
+                ['description' => 'Shirts', 'quantity' => 2, 'container_number' => 'mscu1234567'],
+                ['description' => 'Pants', 'quantity' => 3, 'container_number' => 'MSCU1234567'],
+                ['description' => 'Jackets', 'quantity' => 1, 'container_number' => 'MSCU7654321'],
+            ],
+        ])->assertCreated()->json('data.id');
+        $url = $this->url($this->orgA, "shipments/{$id}");
+        $shipment = $this->orgA->shipments()->findOrFail($id);
+        $document = $shipment->documents()->create([
+            'organization_id' => $this->orgA->id,
+            'document_type' => 'delivery_order',
+            'document_number' => 'DO-1',
+            'file_name' => 'delivery-order.pdf',
+            'status' => 'verified',
+        ]);
+
+        $this->getJson($url)->assertOk()
+            ->assertJsonCount(2, 'data.destination_pickup.containers')
+            ->assertJsonPath('data.destination_pickup.containers.0.carrier_release_confirmed', false)
+            ->assertJsonPath('data.destination_pickup.documents.0.id', $document->id)
+            ->assertJsonMissingPath('data.destination_pickup.documents.0.file_name');
+
+        $record = fn (string $code, string $number = 'mscu1234567') => $this->postJson("{$url}/milestones", [
+            'code' => $code,
+            'title' => 'Pickup milestone',
+            'container_number' => $number,
+        ]);
+
+        $record('CARRIER_RELEASE_CONFIRMED', 'UNRELATED')->assertUnprocessable()->assertJsonValidationErrors('container_number');
+        $record('DEPARTED')->assertUnprocessable()->assertJsonValidationErrors('container_number');
+        $event = $record('CARRIER_RELEASE_CONFIRMED')->assertCreated()
+            ->assertJsonPath('data.container_number', 'MSCU1234567')->json('data.id');
+        $record('CARRIER_RELEASE_CONFIRMED')->assertCreated()->assertJsonPath('data.id', $event);
+        $this->assertDatabaseCount('shipment_milestones', 2);
+        $record('TERMINAL_PICKUP_AUTHORIZED')->assertCreated();
+        $record('CONTAINER_GATED_OUT')->assertUnprocessable()->assertJsonValidationErrors('code');
+
+        $this->patchJson($url, ['customs_status' => 'released'])->assertOk();
+        $this->getJson($url)->assertOk()
+            ->assertJsonPath('data.destination_pickup.ready_count', 1)
+            ->assertJsonPath('data.destination_pickup.containers.0.ready', true)
+            ->assertJsonPath('data.destination_pickup.containers.1.ready', false);
+        $record('CONTAINER_GATED_OUT', 'MSCU7654321')->assertUnprocessable();
+        $record('TERMINAL_PICKUP_WITHDRAWN')->assertCreated();
+        $this->getJson($url)->assertOk()->assertJsonPath('data.destination_pickup.ready_count', 0);
+        $record('CONTAINER_GATED_OUT')->assertUnprocessable();
+        $record('TERMINAL_PICKUP_AUTHORIZED')->assertCreated();
+        $gateOut = $record('CONTAINER_GATED_OUT')->assertCreated()->json('data.occurred_at');
+        $record('CARRIER_RELEASE_WITHDRAWN')->assertUnprocessable();
+
+        $this->getJson($url)->assertOk()
+            ->assertJsonPath('data.destination_pickup.containers.0.gated_out_at', $gateOut)
+            ->assertJsonPath('data.destination_pickup.ready_count', 0)
+            ->assertJsonPath('data.status', 'draft');
+        $this->assertDatabaseHas('audit_events', [
+            'organization_id' => $this->orgA->id,
+            'action' => 'shipment_milestone.created',
+            'metadata->code' => 'CONTAINER_GATED_OUT',
+            'metadata->container_number' => 'MSCU1234567',
+        ]);
+
+        $viewer = User::factory()->create();
+        $this->orgA->memberships()->create(['user_id' => $viewer->id, 'role' => 'viewer']);
+        $this->actingAs($viewer);
+        $this->getJson($url)->assertOk()->assertJsonPath('data.destination_pickup.containers.0.gated_out_at', $gateOut);
+        $record('CARRIER_RELEASE_CONFIRMED', 'MSCU7654321')->assertForbidden();
+
+        $this->actingAs($this->ownerB);
+        $this->getJson($url)->assertNotFound();
+        $this->postJson($this->url($this->orgB, "shipments/{$id}/milestones"), [
+            'code' => 'CARRIER_RELEASE_CONFIRMED',
+            'title' => 'Forged carrier release',
+            'container_number' => 'MSCU7654321',
+        ])->assertNotFound();
     }
 
     public function test_adversarial_cross_tenant_isolation(): void

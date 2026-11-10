@@ -59,7 +59,7 @@ class FreightCatalogController
                     ['value' => 'declaration_drafted', 'label' => 'ASYCUDA Declaration Drafted'],
                     ['value' => 'under_inspection', 'label' => 'Physical / Document Inspection'],
                     ['value' => 'cleared', 'label' => 'Customs Cleared'],
-                    ['value' => 'released', 'label' => 'Port / Gate Released'],
+                    ['value' => 'released', 'label' => 'Customs Release Recorded'],
                 ],
                 'milestone_presets' => [
                     ['code' => 'BOOKING_CONFIRMED', 'title' => 'Booking Confirmed with Carrier'],

@@ -183,6 +183,21 @@
   html {
     @apply font-sans;
   }
+  h1, .text-display {
+    letter-spacing: -0.028em;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+  h2 {
+    letter-spacing: -0.022em;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  h3, h4 {
+    letter-spacing: -0.015em;
+    font-weight: 600;
+    line-height: 1.35;
+  }
 }
 :root {
   --background: #f8fafc;
@@ -192,7 +207,7 @@
   --secondary: #f1f5f9;
   --secondary-foreground: #1e293b;
   --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted-foreground: #52647a;
   --accent: #eff6ff;
   --accent-foreground: #1e3a8a;
   --border: #e2e8f0;
@@ -218,25 +233,6 @@ body {
   font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "cv11" 1, "calt" 1, "kern" 1;
   letter-spacing: -0.011em;
   color: var(--foreground);
-}
-
-/* Headings typographic hierarchy - tight tracking */
-h1, .text-display {
-  letter-spacing: -0.028em;
-  font-weight: 700;
-  line-height: 1.15;
-}
-
-h2 {
-  letter-spacing: -0.022em;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-h3, h4 {
-  letter-spacing: -0.015em;
-  font-weight: 600;
-  line-height: 1.35;
 }
 
 /* ========================================================================= */
@@ -562,23 +558,24 @@ button:disabled {
   font-size: 10px;
   font-weight: 600;
 }
-.metric-card {
+.metric-card,
+.panel {
+  background: var(--card);
+  color: var(--card-foreground);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: white;
-  padding: 22px;
-  transition:
-    border-color 0.2s,
-    transform 0.2s;
+  border-radius: 0.875rem;
+}
+.metric-card {
+  padding: 1rem;
+  transition: border-color 150ms ease, background-color 150ms ease;
 }
 .metric-card:hover {
   border-color: #93c5fd;
-  transform: translateY(-2px);
+  background: var(--accent);
 }
-.panel {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 14px;
+.metric-card:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
 }
 .panel-heading {
   display: flex;
@@ -588,13 +585,13 @@ button:disabled {
   padding: 24px;
 }
 .panel-heading h2 {
-  font-size: 13px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .panel-heading p {
-  font-size: 11px;
-  margin-top: 5px;
-  line-height: 1.6;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  line-height: 1.5;
   color: var(--muted-foreground);
 }
 .step-number {
@@ -664,27 +661,9 @@ fieldset:disabled {
   padding: 2px 6px;
   font-size: 9px;
 }
-.hero-grid {
-  position: absolute;
-  inset: 0;
-  opacity: 0.12;
-  background-image:
-    linear-gradient(#93c5fd 1px, transparent 1px),
-    linear-gradient(90deg, #93c5fd 1px, transparent 1px);
-  background-size: 50px 50px;
-  mask-image: linear-gradient(to right, transparent 35%, black);
-}
-.auth-orbit {
-  position: absolute;
-  border: 1px solid #ffffff10;
-  border-radius: 50%;
-  width: 650px;
-  height: 650px;
-  top: 10%;
-  left: 10%;
-  box-shadow:
-    0 0 0 100px #ffffff04,
-    0 0 0 200px #ffffff03;
+.brand-surface {
+  background-color: #0c1e3d;
+  background-image: linear-gradient(120deg, #0c1e3d, #173e6e);
 }
 
 /* Platform navigation */
